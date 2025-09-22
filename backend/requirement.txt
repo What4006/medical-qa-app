@@ -1,0 +1,14 @@
+# Flask
+Flask
+Flask-SQLAlchemy
+Flask-Migrate
+Flask-Cors
+
+# MySQL Connector
+PyMySQL
+
+# Environment variables
+python-dotenv
+
+# For production deployment (optional but good practice)
+gunicorn
