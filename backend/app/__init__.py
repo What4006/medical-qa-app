@@ -1,6 +1,7 @@
 from flask import Flask
 from .config import config
-from .core.extensions import db, migrate, cors
+from .core.extensions import db, migrate, cors, ma
+from flask_jwt_extended import JWTManager  #  导入 JWTManager
 
 def create_app(config_name='default'):
     """
@@ -16,15 +17,15 @@ def create_app(config_name='default'):
     db.init_app(app)
     migrate.init_app(app, db)
     cors.init_app(app, supports_credentials=True)
+    ma.init_app(app)
+    jwt = JWTManager(app)
 
     # 3. 导入并注册蓝图 (Blueprint)
-    # 当你开始编写 API 时，会在这里取消注释
-    # from .api.history_api import history_bp
-    # app.register_blueprint(history_bp, url_prefix='/api/v1')
+    from .api.user_api import user_bp
+    app.register_blueprint(user_bp)
 
     # 4. 导入数据库模型，以便 Flask-Migrate 能够检测到它们
     # 这是让 `flask db migrate` 正常工作的关键一步
-    # **已根据你的文件结构进行修正**
     from .models import user_model, consultation_model, appointment_model, review_model
 
     return app

@@ -29,3 +29,25 @@ class ChatMessageModel(db.Model):
     sender_type = db.Column(db.String(10), nullable=False, comment="发送方 ('user' 或 'ai')")
     content = db.Column(db.Text, nullable=False, comment='消息内容')
     timestamp = db.Column(db.DateTime, default=datetime.utcnow, comment='消息发送时间')
+
+class DoctorConsultationModel(db.Model):
+    __tablename__ = 'doctor_consultations'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    
+    # 关联到 'users' 表的病人ID
+    patient_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    # 关联到 'users' 表的医生ID
+    doctor_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    
+    appointment_time = db.Column(db.DateTime, nullable=False, comment='预约的问诊时间')
+    department = db.Column(db.String(100), comment='科室')
+    status = db.Column(db.String(20), default='scheduled', comment="状态 ('scheduled', 'completed', 'cancelled')")
+    patient_symptoms = db.Column(db.Text, comment='病人主诉的症状')
+    doctor_diagnosis = db.Column(db.Text, comment='医生的诊断和建议')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, comment='记录创建时间')
+
+    # --- SQLAlchemy 关系定义 ---
+    # 为了避免和 UserModel 中已有的 backref 冲突，可以为 patient 和 doctor 的 backref 指定不同的名字
+    patient = db.relationship('UserModel', foreign_keys=[patient_id], backref='patient_consultations')
+    doctor = db.relationship('UserModel', foreign_keys=[doctor_id], backref='doctor_consultations')
