@@ -1,7 +1,6 @@
 from flask import Flask
 from .config import config
-from .core.extensions import db, migrate, cors, ma
-from flask_jwt_extended import JWTManager  #  导入 JWTManager
+from .core.extensions import db, migrate, cors, ma, jwt
 
 def create_app(config_name='default'):
     """
@@ -18,11 +17,13 @@ def create_app(config_name='default'):
     migrate.init_app(app, db)
     cors.init_app(app, supports_credentials=True)
     ma.init_app(app)
-    jwt = JWTManager(app)
+    jwt.init_app(app)
 
     # 3. 导入并注册蓝图 (Blueprint)
     from .api.user_api import user_bp
     app.register_blueprint(user_bp)
+    from .api.history_api import history_bp
+    app.register_blueprint(history_bp)
 
     # 4. 导入数据库模型，以便 Flask-Migrate 能够检测到它们
     # 这是让 `flask db migrate` 正常工作的关键一步

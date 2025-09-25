@@ -16,6 +16,19 @@ class DevelopmentConfig(Config):
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
         'mysql+pymysql://root:@127.0.0.1/medical_qa_app_db?charset=utf8mb4'
 
+class TestingConfig(Config):
+    """
+    测试环境配置
+    """
+    TESTING = True # 开启测试模式
+    # 使用内存中的 SQLite 数据库，速度最快，每次测试都是全新的数据库
+    SQLALCHEMY_DATABASE_URI = os.environ.get('TEST_DATABASE_URL') or 'sqlite:///:memory:'
+    # 在测试环境中禁用 CSRF 保护，因为测试客户端处理 CSRF cookies 很麻烦
+    JWT_CSRF_PROTECTION = False
+    # --- 添加下面这一行，以明确禁用 Flask-WTF 的 CSRF 功能 ---
+    # 这样可以防止任何隐式的 CSRF 启用
+    WTF_CSRF_ENABLED = False
+
 class ProductionConfig(Config):
     """生产环境配置"""
     # 生产环境的连接字符串应该总是从环境变量中获取，以保证安全
@@ -25,6 +38,7 @@ class ProductionConfig(Config):
 # 创建一个配置字典，方便在 create_app 中根据字符串选择配置
 config = {
     'development': DevelopmentConfig,
+    'testing': TestingConfig,
     'production': ProductionConfig,
     'default': DevelopmentConfig
 }

@@ -4,6 +4,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_cors import CORS
 from flask_marshmallow import Marshmallow 
+from flask_jwt_extended import JWTManager
 
 # 1. 实例化 SQLAlchemy，用于操作数据库 ORM
 # 这个 db 对象需要被你的 models 文件导入，用来定义数据模型
@@ -20,3 +21,6 @@ cors = CORS()
 # 4. 实例化 Marshmallow，用于处理数据序列化/验证
 # 这个 ma 对象需要被你的 schemas 文件导入，用来定义数据格式
 ma = Marshmallow()
+
+# 5. 创建 jwt 实例
+jwt = JWTManager()
