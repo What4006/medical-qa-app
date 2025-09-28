@@ -1,8 +1,10 @@
-# Flask
+# Flask and extensions
 Flask
 Flask-SQLAlchemy
 Flask-Migrate
 Flask-Cors
+Flask-Marshmallow
+Flask-JWT-Extended
 
 # MySQL Connector
 PyMySQL
@@ -12,3 +14,13 @@ python-dotenv
 
 # For production deployment (optional but good practice)
 gunicorn
+
+# Other dependencies
+alembic
+blinker
+click
+itsdangerous
+Jinja2
+MarkupSafe
+SQLAlchemy
+Werkzeug
