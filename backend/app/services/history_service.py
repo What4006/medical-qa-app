@@ -36,14 +36,13 @@ def find_or_create_main_ai_consultation(user_id):
         
     # 3. 如果没找到，为该用户创建一个全新的主问诊记录
     else:
-        new_consultation = AIConsultationModel(
-            patient_id=user_id,
-            status='processing', # '进行中'状态
-            ai_diagnosis=f"用户 {user_id} 的AI健康助手", # 通用标题
-            ai_analysis="用户的完整AI问诊记录"
-        )
-        db.session.add(new_consultation)
-        db.session.commit()
+        # 准备一条初始的、虚拟的问答对，作为“欢迎消息”
+        initial_question = "开始新的问诊"
+        initial_answer = "您好！我是AI问诊助手，很高兴为您服务。请描述您的症状..."
+
+        # 调用您指定的、更完整的创建函数
+        new_consultation = create_ai_consultation_record(user_id, initial_question, initial_answer)
+        
         return new_consultation
 
 def get_chat_history(user_id, consultation_id):
