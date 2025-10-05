@@ -1,4 +1,7 @@
 import os
+# --- 核心修改：在所有其他导入之前，首先加载 .env 文件 ---
+from dotenv import load_dotenv
+load_dotenv()
 
 from app import create_app
 from app.core.extensions import db

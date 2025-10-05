@@ -30,6 +30,8 @@ def create_app(config_name='default'):
     app.register_blueprint(history_bp)
     from .api.auth_api import auth_bp
     app.register_blueprint(auth_bp)
+    from .api.chat_api import chat_bp
+    app.register_blueprint(chat_bp)
 
     # 4. 导入数据库模型，以便 Flask-Migrate 能够检测到它们
     # 这是让 `flask db migrate` 正常工作的关键一步

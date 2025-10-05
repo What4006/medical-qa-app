@@ -13,8 +13,7 @@ class DevelopmentConfig(Config):
     """开发环境配置"""
     DEBUG = True
     # 正确的 PyMySQL 驱动格式是 'mysql+pymysql'。
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
-        'mysql+pymysql://root:@127.0.0.1/medical_qa_app_db?charset=utf8mb4'
+    SQLALCHEMY_DATABASE_URI = 'mysql+pymysql://root:Tyj317050@127.0.0.1/medical_qa_app_db?charset=utf8mb4'
 
 class TestingConfig(Config):
     """
