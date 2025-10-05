@@ -1,0 +1,599 @@
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>医智通 - AI智能问诊</title>
+  <!-- 基础样式与脚本 -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+
+  <!-- Tailwind配置 -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            patient: { // 病人端主色：淡蓝色
+              50: '#f0f7ff', 100: '#e0efff', 200: '#b9ddff', 
+              300: '#7cc3fc', 400: '#3d9fe8', 500: '#0a84e3', 
+              600: '#0066c7', 700: '#0052a3', 800: '#004382'
+            },
+            doctor: { // 医护端主色：淡青色
+              50: '#f0fdfa', 100: '#ccfbf1', 200: '#99f6e4', 
+              300: '#5eead4', 400: '#2dd4bf', 500: '#14b8a6', 
+              600: '#0d9488', 700: '#0f766e', 800: '#115e59'
+            },
+            success: '#10b981', warning: '#f59e0b', danger: '#ef4444',
+            doubao: { // 豆包风格颜色
+              bg: '#f5f5f7',
+              border: '#e5e5ea',
+              send: '#007aff'
+            }
+          },
+          fontFamily: {
+            sans: ['Microsoft YaHei', 'Source Han Sans CN', 'sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+
+  <style type="text/tailwindcss">
+    @layer utilities {
+      .content-auto { content-visibility: auto; }
+      .transition-300 { transition: all 300ms ease; }
+      .scrollbar-hide::-webkit-scrollbar { display: none; }
+      .backdrop-blur { backdrop-filter: blur(8px); }
+      .message-appear { animation: fadeIn 0.4s cubic-bezier(0.22, 1, 0.36, 1); }
+      .button-loading { animation: spin 1s linear infinite; }
+      .shake { animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+      @keyframes shake {
+        10%, 90% { transform: translateX(-1px); }
+        20%, 80% { transform: translateX(2px); }
+        30%, 50%, 70% { transform: translateX(-3px); }
+        40%, 60% { transform: translateX(3px); }
+      }
+    }
+  </style>
+</head>
+<body class="bg-neutral-50 min-h-screen flex flex-col">
+  <!-- 顶部导航 - 包含返回键和AI助手信息 -->
+  <header class="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur shadow-sm transition-300">
+    <div class="container mx-auto px-4 py-3 flex items-center justify-between">
+      <!-- 左侧区域：返回键 + AI助手信息 -->
+      <div class="flex items-center space-x-3">
+        <!-- 返回按钮 -->
+        <button class="text-neutral-700 hover:text-patient-500 transition-300 flex-shrink-0" onclick="history.back()">
+          <i class="fa fa-arrow-left text-xl"></i>
+        </button>
+        
+        <!-- AI助手信息（移至返回键右侧） -->
+        <div class="flex items-center space-x-3">
+          <div class="w-8 h-8 rounded-full bg-gradient-to-br from-patient-500 to-doctor-500 flex items-center justify-center">
+            <i class="fa fa-user-md text-white text-sm"></i>
+          </div>
+          <div>
+            <h3 class="font-medium text-neutral-800 text-sm">AI问诊助手</h3>
+          </div>
+        </div>
+      </div>
+
+      <!-- 右侧区域 -->
+      <div class="flex items-center space-x-6 flex-shrink-0">
+        <button id="mobile-menu-btn" class="md:hidden text-neutral-700 hover:text-patient-500 transition-300">
+          <i class="fa fa-bars text-xl"></i>
+        </button>
+
+        <div class="hidden md:flex items-center space-x-6">
+          <div class="relative">
+            <button class="text-neutral-600 hover:text-patient-500 transition-300">
+              <i class="fa fa-bell text-xl"></i>
+              <span class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-danger text-white text-xs rounded-full flex items-center justify-center"></span>
+            </button>
+          </div>
+          <div>
+            <button class="text-neutral-700 hover:text-patient-500 transition-300">
+              <i class="fa fa-cog text-2xl"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 移动端菜单 -->
+    <div id="mobile-menu" class="md:hidden hidden bg-white border-t border-neutral-200">
+      <div class="container mx-auto px-4 py-3">
+        <nav class="space-y-1">
+          <a href="patient-home.html" class="block py-2 px-3 rounded-lg hover:bg-neutral-100 text-neutral-700 transition-300">首页</a>
+          <a href="patient-ai-consult.html" class="block py-2 px-3 rounded-lg bg-patient-50 text-patient-700 font-medium">AI问诊</a>
+          <a href="patient-doctor-book.html" class="block py-2 px-3 rounded-lg hover:bg-neutral-100 text-neutral-700 transition-300">预约医生</a>
+          <a href="patient-medical-record.html" class="block py-2 px-3 rounded-lg hover:bg-neutral-100 text-neutral-700 transition-300">我的病历</a>
+          <a href="patient-profile.html" class="block py-2 px-3 rounded-lg hover:bg-neutral-100 text-neutral-700 transition-300">个人中心</a>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <!-- 主内容区 - 全屏聊天界面 -->
+  <main class="flex-1 pt-16 pb-64"> <!-- 为底部输入区预留空间 -->
+    <div class="container mx-auto px-4 py-4 h-full">
+      <!-- 聊天消息区域 - 占满剩余空间 -->
+      <div id="chat-messages" class="flex-1 p-4 overflow-y-auto scrollbar-hide space-y-6 min-h-[calc(100vh-240px)]">
+        <!-- 加载提示 -->
+        <div id="history-loading" class="py-12 text-center">
+          <i class="fa fa-circle-o-notch fa-spin text-patient-500 text-2xl mb-2"></i>
+          <p class="text-neutral-500">正在加载历史记录...</p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- 输入区域 - 固定在底部（豆包聊天风格） -->
+  <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-neutral-200 shadow-lg z-40">
+    <div class="container mx-auto px-4 py-3">
+      <!-- 文件预览区 -->
+      <div id="file-preview-list" class="flex gap-2 mb-2"></div>
+      <div class="flex items-end gap-3">
+        <!-- 附件按钮 -->
+        <button id="attach-btn" type="button" class="w-10 h-10 rounded-full bg-doubao-bg flex items-center justify-center text-neutral-600 hover:bg-neutral-200 transition-300">
+          <i class="fa fa-paperclip"></i>
+        </button>
+        <!-- 隐藏的文件选择框 -->
+        <input id="file-input" type="file" multiple class="hidden" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" />
+        <!-- 输入框 -->
+        <div class="flex-1 relative">
+          <textarea id="message-input" rows="1" class="w-full p-3 bg-doubao-bg border border-doubao-border rounded-2xl focus:outline-none focus:ring-2 focus:ring-doubao-send/30 focus:border-transparent transition-300 resize-none" placeholder="请描述您的症状..."></textarea>
+          <div id="char-count" class="absolute bottom-2 right-3 text-neutral-400 text-xs">0/500</div>
+        </div>
+        
+        <!-- 发送按钮 -->
+        <button id="send-button" type="button" class="w-10 h-10 rounded-full bg-doubao-send text-white flex items-center justify-center hover:bg-doubao-send/90 transition-300" aria-label="发送消息">
+          <i class="fa fa-paper-plane"></i>
+        </button>
+      </div>
+
+      <!-- 辅助信息 -->
+      <div class="mt-3 bg-neutral-50 p-3 text-xs text-neutral-600 border-t border-neutral-200">
+        <p class="flex items-start">
+          <i class="fa fa-info-circle text-patient-500 mt-1 mr-2"></i>
+          <span>AI问诊仅供参考，不能替代专业医生诊断。如症状持续或加重，请及时前往医院就诊。</span>
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 底部 -->
+  <footer class="hidden bg-white border-t border-neutral-200 py-4">
+    <div class="container mx-auto px-4 text-center text-neutral-500 text-xs">
+      <p>© 2024 医智通 版权所有 | 数据传输加密 隐私合规</p>
+      <div class="flex justify-center space-x-4 mt-2">
+        <a href="#" class="hover:text-patient-500 transition-300">隐私政策</a>
+        <a href="#" class="hover:text-patient-500 transition-300">用户协议</a>
+        <a href="#" class="hover:text-patient-500 transition-300">客服中心</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- 核心交互脚本 -->
+  <script src="js/services/apiService.js"></script>
+  <script>
+    // 等待DOM完全加载，避免元素未渲染时绑定事件
+    document.addEventListener('DOMContentLoaded', function() {
+      // 1. 获取所有需要的DOM元素（添加容错处理）
+      const mobileMenuBtn = document.getElementById('mobile-menu-btn') || null;
+      const mobileMenu = document.getElementById('mobile-menu') || null;
+      const chatMessages = document.getElementById('chat-messages') || null;
+      const historyLoading = document.getElementById('history-loading') || null;
+      const messageInput = document.getElementById('message-input') || null;
+      const charCount = document.getElementById('char-count') || null;
+      const sendButton = document.getElementById('send-button') || null;
+      const attachBtn = document.getElementById('attach-btn');
+      const fileInput = document.getElementById('file-input');
+      const filePreviewList = document.getElementById('file-preview-list');
+      let selectedFiles = [];
+
+      attachBtn.addEventListener('click', () => fileInput.click());
+
+      fileInput.addEventListener('change', function(e) {
+        const files = Array.from(e.target.files);
+        files.forEach(f => {
+          if (!selectedFiles.some(sf => sf.name === f.name && sf.size === f.size)) {
+            selectedFiles.push(f);
+          }
+        });
+        renderFilePreviews();
+        fileInput.value = '';
+      });
+
+      function renderFilePreviews() {
+        filePreviewList.innerHTML = '';
+        selectedFiles.forEach((file, idx) => {
+          const card = document.createElement('div');
+          card.className = 'flex items-center bg-neutral-100 rounded px-2 py-1 text-xs relative';
+          if (file.type.startsWith('image/')) {
+            const img = document.createElement('img');
+            img.src = URL.createObjectURL(file);
+            img.className = 'w-8 h-8 rounded mr-2 object-cover';
+            card.appendChild(img);
+          } else {
+            card.innerHTML += `<i class="fa fa-file-o mr-2 text-neutral-500"></i>`;
+          }
+          card.innerHTML += `<span class="mr-2">${file.name}</span>`;
+          const delBtn = document.createElement('button');
+          delBtn.className = 'ml-1 text-danger hover:text-danger/80';
+          delBtn.innerHTML = '<i class="fa fa-times"></i>';
+          delBtn.onclick = () => {
+            selectedFiles.splice(idx, 1);
+            renderFilePreviews();
+          };
+          card.appendChild(delBtn);
+          filePreviewList.appendChild(card);
+        });
+      }
+
+      // 验证关键元素是否存在，避免报错
+      if (!messageInput || !sendButton || !chatMessages) {
+        console.error('核心聊天元素未找到，无法初始化聊天功能');
+        return;
+      }
+
+      // 2. 确保聊天区域可滚动
+      function ensureScrollable() {
+        chatMessages.style.overflowY = 'auto';
+        chatMessages.style.height = 'auto';
+        chatMessages.style.maxHeight = 'calc(100vh - 240px)';
+        // 添加平滑滚动样式
+        chatMessages.style.scrollBehavior = 'smooth';
+      }
+
+      // 初始化时确保滚动区域设置正确
+      ensureScrollable();
+
+      // 3. 平滑滚动到最新消息的功能函数
+      function scrollToLatestMessage() {
+        // 使用requestAnimationFrame确保动画流畅
+        requestAnimationFrame(() => {
+          // 获取最后一条消息元素
+          const messages = chatMessages.querySelectorAll('.message-appear');
+          if (messages.length === 0) return;
+          
+          const lastMessage = messages[messages.length - 1];
+          
+          // 计算目标位置（最后一条消息底部）
+          const targetPosition = lastMessage.offsetTop + lastMessage.offsetHeight;
+          const currentPosition = chatMessages.scrollTop + chatMessages.clientHeight;
+          
+          // 只有当最后一条消息不在视图中时才滚动
+          if (targetPosition > currentPosition + 10 || targetPosition < chatMessages.scrollTop - 10) {
+            // 使用平滑滚动到元素
+            lastMessage.scrollIntoView({
+              behavior: 'smooth',
+              block: 'end',
+              inline: 'nearest'
+            });
+          }
+        });
+      }
+
+      // 4. 移动端菜单功能
+      if (mobileMenuBtn && mobileMenu) {
+        mobileMenuBtn.addEventListener('click', function() {
+          mobileMenu.classList.toggle('hidden');
+        });
+      }
+
+      // 5. 自动调整输入框高度
+      function adjustTextareaHeight() {
+        if (messageInput && charCount) {
+          messageInput.style.height = 'auto';
+          // 限制最大高度
+          const newHeight = Math.min(messageInput.scrollHeight, 120);
+          messageInput.style.height = newHeight + 'px';
+          // 更新字数统计
+          const textLength = messageInput.value ? messageInput.value.length : 0;
+          charCount.textContent = textLength + '/500';
+          
+          // 当输入内容时改变发送按钮样式
+          if (textLength > 0) {
+            sendButton.classList.add('scale-105');
+          } else {
+            sendButton.classList.remove('scale-105');
+          }
+        }
+      }
+
+      // 初始化输入框高度
+      adjustTextareaHeight();
+
+      // 监听输入事件，实时调整高度和字数
+      if (messageInput) {
+        messageInput.addEventListener('input', adjustTextareaHeight);
+      }
+
+      // 6. 时间格式化工具函数 - 增加无效时间处理
+      function formatTime(timestamp) {
+        const date = new Date(timestamp);
+        // 检查是否为有效日期
+        if (isNaN(date.getTime())) {
+          return '时间未知';
+        }
+        return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+      }
+
+      // 7. 渲染用户消息（复用函数）
+      function renderUserMessage(content, time) {
+        const timeStr = formatTime(time);
+        const userMsgDiv = document.createElement('div');
+        userMsgDiv.className = 'flex items-start justify-end message-appear';
+        userMsgDiv.innerHTML = `
+          <div class="max-w-[80%]">
+            <div class="bg-patient-500 text-white p-4 rounded-lg rounded-tr-none">
+              <p>${escapeHtml(content)}</p>
+            </div>
+            <p class="text-xs text-neutral-400 mt-1 text-right">${timeStr}</p>
+          </div>
+          <div class="w-9 h-9 rounded-full bg-neutral-200 flex items-center justify-center flex-shrink-0 ml-3">
+            <i class="fa fa-user text-neutral-600"></i>
+          </div>
+        `;
+        chatMessages.appendChild(userMsgDiv);
+        scrollToLatestMessage();
+        return userMsgDiv; // 返回创建的元素，便于后续可能的删除操作
+      }
+
+      // 8. 渲染AI消息（复用函数）
+      function renderAiMessage(content, time) {
+        const timeStr = formatTime(time);
+        const aiMsgDiv = document.createElement('div');
+        aiMsgDiv.className = 'flex items-start message-appear';
+        aiMsgDiv.innerHTML = `
+          <div class="w-9 h-9 rounded-full bg-gradient-to-br from-patient-500 to-doctor-500 flex items-center justify-center flex-shrink-0 mr-3">
+            <i class="fa fa-user-md text-white"></i>
+          </div>
+          <div class="max-w-[80%]">
+            <div class="bg-patient-50 p-4 rounded-lg rounded-tl-none border border-patient-100">
+              <p>${escapeHtml(content)}</p>
+            </div>
+            <p class="text-xs text-neutral-400 mt-1">${timeStr}</p>
+          </div>
+        `;
+        chatMessages.appendChild(aiMsgDiv);
+        scrollToLatestMessage();
+        return aiMsgDiv; // 返回创建的元素，便于后续可能的删除操作
+      }
+
+      // 9. 渲染错误提示（复用函数）
+      function renderErrorMsg(msg) {
+        const now = new Date();
+        const timeStr = formatTime(now);
+        const errorMsgDiv = document.createElement('div');
+        errorMsgDiv.className = 'flex items-start message-appear';
+        errorMsgDiv.innerHTML = `
+          <div class="w-9 h-9 rounded-full bg-gradient-to-br from-patient-500 to-doctor-500 flex items-center justify-center flex-shrink-0 mr-3">
+            <i class="fa fa-user-md text-white"></i>
+          </div>
+          <div class="max-w-[80%]">
+            <div class="bg-danger/10 p-4 rounded-lg rounded-tl-none border border-danger/20">
+              <p class="text-danger">${msg}</p>
+            </div>
+            <p class="text-xs text-neutral-400 mt-1">${timeStr}</p>
+          </div>
+        `;
+        chatMessages.appendChild(errorMsgDiv);
+        scrollToLatestMessage();
+      }
+
+      // 10. 添加初始AI欢迎消息
+      function addInitialAiMessage() {
+        const now = new Date();
+        const timeStr = formatTime(now);
+        const aiMsgDiv = document.createElement('div');
+        aiMsgDiv.className = 'flex items-start message-appear';
+        aiMsgDiv.innerHTML = `
+          <div class="w-9 h-9 rounded-full bg-gradient-to-br from-patient-500 to-doctor-500 flex items-center justify-center flex-shrink-0 mr-3">
+            <i class="fa fa-user-md text-white"></i>
+          </div>
+          <div class="max-w-[80%]">
+            <div class="bg-patient-50 p-4 rounded-lg rounded-tl-none border border-patient-100">
+              <p class="text-neutral-800">您好！我是AI问诊助手，很高兴为您服务。请描述您的症状，例如哪里不舒服、持续了多久、有没有其他伴随症状等，我会为您提供初步的健康建议。</p>
+            </div>
+            <p class="text-xs text-neutral-400 mt-1">${timeStr}</p>
+          </div>
+        `;
+        chatMessages.appendChild(aiMsgDiv);
+        scrollToLatestMessage();
+      }
+
+      // 11. 添加“继续咨询”的AI提示消息
+      function addAiPromptMessage() {
+        const now = new Date();
+        const timeStr = formatTime(now);
+        const aiMsgDiv = document.createElement('div');
+        aiMsgDiv.className = 'flex items-start message-appear';
+        aiMsgDiv.innerHTML = `
+          <div class="w-9 h-9 rounded-full bg-gradient-to-br from-patient-500 to-doctor-500 flex items-center justify-center flex-shrink-0 mr-3">
+            <i class="fa fa-user-md text-white"></i>
+          </div>
+          <div class="max-w-[80%]">
+            <div class="bg-patient-50 p-4 rounded-lg rounded-tl-none border border-patient-100">
+              <p class="text-neutral-800">如果您还有其他身体不适的地方，欢迎继续向我咨询～</p>
+            </div>
+            <p class="text-xs text-neutral-400 mt-1">${timeStr}</p>
+          </div>
+        `;
+        chatMessages.appendChild(aiMsgDiv);
+        scrollToLatestMessage();
+      }
+
+      // 12. 加载历史聊天记录
+      async function loadHistoryChats() {
+        try {
+          // 调用API获取历史对话
+          const historyChats = await apiService.getMedicalChatHistory();
+          
+          // 移除加载提示
+          if (historyLoading && historyLoading.parentNode) {
+            historyLoading.parentNode.removeChild(historyLoading);
+          }
+          
+          // 验证返回数据是否为数组
+          if (!Array.isArray(historyChats)) {
+            throw new Error('历史记录格式错误');
+          }
+          
+          if (historyChats.length > 0) {
+            let lastDate = null;
+            
+            // 遍历渲染每条历史对话
+            historyChats.forEach(chat => {
+              // 验证单条记录格式
+              if (!chat || typeof chat !== 'object' || !chat.question || !chat.answer || !chat.createdAt) {
+                console.warn('跳过格式错误的聊天记录:', chat);
+                return;
+              }
+              
+              // 处理跨天日期分隔线
+              const currentDate = new Date(chat.createdAt).toLocaleDateString();
+              if (currentDate !== lastDate) {
+                const dateDiv = document.createElement('div');
+                dateDiv.className = 'text-center';
+                dateDiv.innerHTML = `<span class="inline-block px-3 py-1 bg-neutral-100 text-neutral-500 rounded-full text-xs">${currentDate}</span>`;
+                chatMessages.appendChild(dateDiv);
+                lastDate = currentDate;
+              }
+              
+              // 渲染“用户历史问题”
+              renderUserMessage(chat.question, chat.createdAt);
+              // 渲染“AI历史回答”
+              renderAiMessage(chat.answer, chat.createdAt);
+            });
+
+            // 检查最后一条AI回答是否过长（超过200字则触发提示）
+            const lastAnswer = historyChats[historyChats.length - 1].answer;
+            if (lastAnswer.length > 200) {
+              setTimeout(addAiPromptMessage, 500); // 延迟显示，提升体验
+            }
+          } else {
+            // 无历史记录时，显示初始欢迎消息
+            addInitialAiMessage();
+          }
+        } catch (error) {
+          console.error('加载历史记录失败:', error.message);
+          
+          // 移除加载提示
+          if (historyLoading && historyLoading.parentNode) {
+            historyLoading.parentNode.removeChild(historyLoading);
+          }
+          
+          // 先显示初始欢迎消息，再显示错误提示（调整顺序）
+          addInitialAiMessage();
+          renderErrorMsg('加载历史记录失败，请稍后再试');
+        }
+      }
+
+      // 13. 初始化：加载历史记录
+      loadHistoryChats();
+
+      // 14. 核心：消息发送功能
+      async function sendMessage() {
+        const messageContent = messageInput.value ? messageInput.value.trim() : '';
+        if (!messageContent && selectedFiles.length === 0) {
+          messageInput.classList.add('shake');
+          setTimeout(() => messageInput.classList.remove('shake'), 500);
+          return;
+        }
+      
+        sendButton.disabled = true;
+        sendButton.innerHTML = '<i class="fa fa-circle-o-notch button-loading"></i>';
+      
+        const now = new Date();
+        const userMsgElement = renderUserMessage(messageContent, now);
+      
+        // 渲染文件预览（消息中）
+        if (selectedFiles.length > 0) {
+          const fileMsgDiv = document.createElement('div');
+          fileMsgDiv.className = 'flex justify-end mb-2';
+          fileMsgDiv.innerHTML = selectedFiles.map(file => {
+            if (file.type.startsWith('image/')) {
+              const url = URL.createObjectURL(file);
+              return `<img src="${url}" class="w-20 h-20 rounded border mr-2" alt="${escapeHtml(file.name)}" />`;
+            } else {
+              return `<span class="inline-flex items-center bg-neutral-200 px-2 py-1 rounded mr-2"><i class="fa fa-file-o mr-1"></i>${escapeHtml(file.name)}</span>`;
+            }
+          }).join('');
+          chatMessages.appendChild(fileMsgDiv);
+          scrollToLatestMessage();
+        }
+      
+        messageInput.value = '';
+        adjustTextareaHeight();
+        filePreviewList.innerHTML = '';
+        selectedFiles = [];
+      
+        try {
+          let aiAnswer;
+          if (selectedFiles.length > 0) {
+            aiAnswer = await apiService.sendMedicalQueryWithFiles(messageContent, selectedFiles);
+          } else {
+            aiAnswer = await apiService.sendMedicalQuery(messageContent);
+          }
+          await apiService.createMedicalRecord(messageContent, aiAnswer);
+          renderAiMessage(aiAnswer, now);
+          if (aiAnswer.length > 200) setTimeout(addAiPromptMessage, 1000);
+        } catch (error) {
+          if (userMsgElement && userMsgElement.parentNode) {
+            userMsgElement.parentNode.removeChild(userMsgElement);
+          }
+          messageInput.value = messageContent;
+          adjustTextareaHeight();
+          renderErrorMsg(`请求失败：${error.message}`);
+        } finally {
+          sendButton.disabled = false;
+          sendButton.innerHTML = '<i class="fa fa-paper-plane"></i>';
+        }
+      }
+
+      // 15. 绑定发送事件（多种触发方式）
+      // 方式1：点击发送按钮
+      sendButton.addEventListener('click', sendMessage);
+
+      // 方式2：按Enter键发送（Shift+Enter换行）
+      messageInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault(); // 阻止默认换行
+          sendMessage();
+        }
+      });
+
+      // 16. 防XSS攻击工具函数
+      function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+      }
+
+      // 窗口大小变化时重新计算滚动区域
+      window.addEventListener('resize', function() {
+        ensureScrollable();
+        // 延迟滚动，确保尺寸调整完成
+        setTimeout(scrollToLatestMessage, 100);
+      });
+
+      // 初始化时滚动到最新消息
+      setTimeout(scrollToLatestMessage, 100);
+      
+      // 初始化完成提示
+      console.log('AI聊天功能初始化完成，可正常发送消息');
+    });
+  </script>
+</body>
+</html>

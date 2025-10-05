@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>医智通 - 我的问诊记录</title>
+  <!-- 基础样式与脚本 -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+  
+  <!-- Tailwind配置 -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            patient: { 
+              50: '#f0f7ff', 100: '#e0efff', 200: '#b9ddff', 
+              300: '#7cc3fc', 400: '#3d9fe8', 500: '#0a84e3', 
+              600: '#0066c7', 700: '#0052a3', 800: '#004382'
+            },
+            doctor: {
+              50: '#f0fff4', 100: '#dcffe4', 200: '#abf7c8',
+              300: '#57e389', 400: '#14b866', 500: '#0fa958',
+              600: '#0d904f', 700: '#0a7844', 800: '#086239'
+            },
+            success: '#10b981', warning: '#f59e0b', danger: '#ef4444'
+          },
+          fontFamily: {
+            sans: ['Microsoft YaHei', 'Source Han Sans CN', 'sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+
+  <style type="text/tailwindcss">
+    @layer utilities {
+      .content-auto { content-visibility: auto; }
+      .transition-300 { transition: all 300ms ease; }
+      .card-hover { @apply hover:shadow-md hover:translate-y-[-2px] transition-300; }
+      .filter-active { @apply bg-patient-500 text-white; }
+      .ai-initial { @apply font-bold text-sm; }
+    }
+  </style>
+</head>
+<body class="bg-neutral-50 min-h-screen flex flex-col">
+  <!-- 顶部导航栏 -->
+  <header class="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur shadow-sm transition-300">
+    <div class="container mx-auto px-4 py-3 flex items-center justify-between">
+      <!-- 返回按钮和标题 -->
+      <div class="flex items-center space-x-3">
+        <button class="text-neutral-700 hover:text-patient-500 transition-300" onclick="history.back()">
+          <i class="fa fa-arrow-left text-xl"></i>
+        </button>
+        <h1 class="text-xl font-bold text-neutral-800">我的问诊记录</h1>
+      </div>
+    </div>
+  </header>
+
+  <!-- 主内容区 -->
+  <main class="flex-1 pt-16 pb-6">
+    <div class="container mx-auto px-4 py-6">
+      <!-- 筛选栏 -->
+      <div class="bg-white rounded-xl shadow-sm p-4 mb-6">
+        <div class="flex flex-wrap gap-2">
+          <button class="filter-btn px-4 py-2 rounded-full text-sm font-medium filter-active transition-300" data-filter="all">全部记录</button>
+          <button class="filter-btn px-4 py-2 bg-white text-neutral-700 hover:bg-neutral-100 rounded-full text-sm font-medium transition-300" data-filter="ai">AI问诊</button>
+          <button class="filter-btn px-4 py-2 bg-white text-neutral-700 hover:bg-neutral-100 rounded-full text-sm font-medium transition-300" data-filter="doctor">医生问诊</button>
+        </div>
+      </div>
+
+      <!-- 问诊记录列表容器 -->
+      <div id="records-container" class="space-y-4">
+        <!-- 加载提示 -->
+        <div id="loading-indicator" class="py-12 text-center">
+          <i class="fa fa-circle-o-notch fa-spin text-patient-500 text-2xl mb-2"></i>
+          <p class="text-neutral-500">正在加载问诊记录...</p>
+        </div>
+        
+        <!-- 空状态提示 (默认隐藏) -->
+        <div id="empty-state" class="hidden py-16 text-center">
+          <div class="w-20 h-20 mx-auto bg-neutral-100 rounded-full flex items-center justify-center mb-4">
+            <i class="fa fa-file-text-o text-neutral-400 text-3xl"></i>
+          </div>
+          <h3 class="text-lg font-medium text-neutral-700 mb-2">暂无问诊记录</h3>
+          <p class="text-neutral-500 mb-6">没有符合筛选条件的问诊记录</p>
+          <a href="patient-ai-consult.html" class="inline-block px-6 py-3 bg-patient-500 text-white rounded-full text-sm font-medium hover:bg-patient-600 transition-300">
+            开始AI问诊
+          </a>
+        </div>
+        
+        <!-- 记录列表将通过JavaScript动态生成 -->
+      </div>
+    </div>
+  </main>
+
+  <!-- 底部 -->
+  <footer class="bg-white border-t border-neutral-200 py-6">
+    <div class="container mx-auto px-4 text-center text-neutral-500 text-sm">
+      <p>© 2024 医智通 版权所有 | 数据传输加密 隐私合规</p>
+      <div class="flex justify-center space-x-4 mt-3">
+        <a href="#" class="hover:text-patient-500 transition-300">隐私政策</a>
+        <a href="#" class="hover:text-patient-500 transition-300">用户协议</a>
+        <a href="#" class="hover:text-patient-500 transition-300">客服中心</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- 交互脚本 -->
+  <script src="js/services/apiService.js"></script>
+  <script>
+    // 存储所有问诊记录和当前筛选条件
+    let allRecords = [];
+    let currentFilter = 'all'; // 'all', 'ai', 'doctor'
+    
+    // 页面加载完成后获取问诊记录
+    document.addEventListener('DOMContentLoaded', function() {
+      // 获取DOM元素
+      const recordsContainer = document.getElementById('records-container');
+      const loadingIndicator = document.getElementById('loading-indicator');
+      const emptyState = document.getElementById('empty-state');
+      const filterButtons = document.querySelectorAll('.filter-btn');
+      
+      // 绑定筛选按钮点击事件
+      filterButtons.forEach(button => {
+        button.addEventListener('click', function() {
+          currentFilter = this.getAttribute('data-filter');
+          applyFilter();
+          
+          // 更新按钮样式
+          updateFilterButtons();
+        });
+      });
+      
+      // 调用API获取问诊记录 - 已修正为正确的函数名
+      apiService.getAllMedicalRecords()
+        .then(records => {
+          // 保存所有记录
+          allRecords = records;
+          
+          // 隐藏加载提示
+          loadingIndicator.remove();
+          
+          // 初始渲染所有记录
+          applyFilter();
+        })
+        .catch(error => {
+          console.error('加载问诊记录失败:', error);
+          loadingIndicator.innerHTML = `
+            <div class="py-12 text-center">
+              <i class="fa fa-exclamation-circle text-danger text-2xl mb-2"></i>
+              <p class="text-neutral-500">加载失败，请稍后重试</p>
+              <button id="retry-btn" class="mt-4 text-patient-500 hover:text-patient-600 transition-300">
+                重试
+              </button>
+            </div>
+          `;
+          
+          // 绑定重试按钮事件
+          document.getElementById('retry-btn').addEventListener('click', function() {
+            location.reload();
+          });
+        });
+    });
+    
+    // 应用筛选条件
+    function applyFilter() {
+      // 重新渲染筛选后的记录
+      renderFilteredRecords();
+    }
+    
+    // 更新筛选按钮样式
+    function updateFilterButtons() {
+      const filterButtons = document.querySelectorAll('.filter-btn');
+      
+      // 重置所有按钮样式
+      filterButtons.forEach(button => {
+        button.classList.remove('filter-active', 'bg-patient-500', 'text-white');
+        button.classList.add('bg-white', 'text-neutral-700', 'hover:bg-neutral-100');
+      });
+      
+      // 设置当前筛选按钮样式
+      document.querySelector(`[data-filter="${currentFilter}"]`).classList.add('filter-active');
+      document.querySelector(`[data-filter="${currentFilter}"]`).classList.remove('bg-white', 'text-neutral-700', 'hover:bg-neutral-100');
+    }
+    
+    // 筛选记录并渲染
+    function renderFilteredRecords() {
+      const recordsContainer = document.getElementById('records-container');
+      const emptyState = document.getElementById('empty-state');
+      
+      // 清空现有记录
+      Array.from(recordsContainer.children).forEach(child => {
+        if (child.id !== 'loading-indicator' && child.id !== 'empty-state') {
+          child.remove();
+        }
+      });
+      
+      // 应用筛选条件
+      let filteredRecords = [...allRecords];
+      
+      // 类型筛选
+      if (currentFilter === 'ai') {
+        filteredRecords = filteredRecords.filter(record => record.type === 'ai');
+      } else if (currentFilter === 'doctor') {
+        filteredRecords = filteredRecords.filter(record => record.type === 'doctor');
+      }
+      
+      // 显示结果
+      if (filteredRecords.length === 0) {
+        emptyState.classList.remove('hidden');
+      } else {
+        emptyState.classList.add('hidden');
+        // 渲染筛选后的记录
+        filteredRecords.forEach(record => {
+          renderRecord(record, recordsContainer);
+        });
+      }
+    }
+    
+    // 渲染单条问诊记录
+    function renderRecord(record, container) {
+      // 创建记录卡片元素
+      const card = document.createElement('div');
+      card.className = 'block bg-white rounded-xl shadow-sm overflow-hidden card-hover cursor-default';
+      
+      // 根据记录类型(AI或医生)设置不同的图标和样式
+      let iconHtml, typeText;
+      if (record.type === 'ai') {
+        iconHtml = '<div class="ai-initial">AI</div>';
+        typeText = 'AI问诊';
+      } else {
+        iconHtml = '<i class="fa fa-user-md text-doctor-600"></i>';
+        typeText = `医生问诊 · ${record.department}`;
+      }
+      
+      // 设置卡片内容
+      card.innerHTML = `
+        <div class="p-4">
+          <div class="flex justify-between items-start mb-2">
+            <div class="flex items-center">
+              <div class="w-10 h-10 rounded-full bg-patient-100 flex items-center justify-center mr-3">
+                ${iconHtml}
+              </div>
+              <div>
+                <h3 class="font-medium text-neutral-800">${typeText}</h3>
+                <p class="text-neutral-500 text-sm">${record.date} ${record.time} ${record.doctor ? '· ' + record.doctor : ''}</p>
+              </div>
+            </div>
+            <span class="px-2 py-1 bg-patient-100 text-patient-700 text-xs rounded-full">${record.status === 'completed' ? '已完成' : '进行中'}</span>
+          </div>
+          <p class="text-neutral-700 ml-13 line-clamp-2">${record.summary}</p>
+        </div>
+      `;
+      
+      // 添加到容器
+      container.appendChild(card);
+    }
+  </script>
+</body>
+</html>
