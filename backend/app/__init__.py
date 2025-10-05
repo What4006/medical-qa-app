@@ -20,6 +20,10 @@ def create_app(config_name='default'):
     jwt.init_app(app)
 
     # 3. 导入并注册蓝图 (Blueprint)
+    #这个api仅用于创建测试时使用的临时用户
+    from .api.dev_api import dev_bp
+    app.register_blueprint(dev_bp)
+
     from .api.user_api import user_bp
     app.register_blueprint(user_bp)
     from .api.history_api import history_bp

@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from ..services.history_service import get_recent_consultation
+from ..services.history_service import get_recent_consultation, get_all_consulations
 # 导入需要检查类型的模型
 from ..models.consultation_model import AIConsultationModel, DoctorConsultationModel
 
@@ -30,3 +30,19 @@ def get_recent_history():
         return jsonify(doctor_schema.dump(record)), 200
     else:
         return jsonify({"error_code": 500, "message": "服务器内部错误"}), 500
+    
+@history_bp.route('/all',methods=['GET'])
+@jwt_required()
+def get_all_history():
+    from ..schemas.history_schema import AiConsultationSchema, DoctorConsultationSchema
+    ai_schema = AiConsultationSchema(many=True)
+    doctor_schema = DoctorConsultationSchema(many=True)
+
+    current_user_id = get_jwt_identity()
+    ai_records,doctor_records=get_all_consulations(current_user_id)
+    ai_list = ai_schema.dump(ai_records)
+    doctor_list = doctor_schema.dump(doctor_records)
+    all_records=ai_list+doctor_list
+
+    sorted_records=sorted(all_records,key=lambda r: (r.get('date',''),r.get('time','')),reverse=True)
+    return jsonify(sorted_records),200

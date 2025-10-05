@@ -15,3 +15,8 @@ def get_recent_consultation(user_id):
         return recent_record_doctor
     else:
         return None
+    
+def get_all_consulations(user_id):
+    ai_records=AIConsultationModel.query.filter_by(patient_id=user_id).all()
+    doctor_records=DoctorConsultationModel.query.filter_by(patient_id=user_id).all()
+    return ai_records,doctor_records
