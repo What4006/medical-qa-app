@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from ..services import llm_service
-from ..services.history_service import get_chat_history, find_or_create_main_ai_consultation, add_chat_message_to_consultation
+from ..services.history_service import get_chat_history, find_or_create_main_ai_consultation, add_chat_message_to_consultation, start_new_chat_session, generate_medical_record_from_history
 
 # 创建 'chat_bp' 蓝图
 chat_bp = Blueprint('chat_api', __name__, url_prefix='/api/chat')
@@ -33,25 +33,21 @@ def get_chat_history_records():
 @jwt_required()
 def get_chat_history_records():
     """
-    【升级版】获取当前用户的完整AI对话历史。
-    它会自动查找或创建用户的唯一会话。
+    获取当前用户所有的AI对话历史记录。
     """
     try:
         user_id = get_jwt_identity()
 
-        # 1. 智能查找或创建用户的主问诊记录
-        main_consultation = find_or_create_main_ai_consultation(user_id)
+        # 1. 调用新的service函数，获取全部历史记录
+        history = get_chat_history(user_id)
         
-        # 2. 获取这个唯一的问诊ID
-        consultation_id = main_consultation.id
+        # 2. 为了兼容前端的“继续对话”功能，我们仍然需要一个默认的consultation_id。
+        #    这里我们查找用户最新的一个会话ID。
+        latest_consultation = find_or_create_main_ai_consultation(user_id) # 复用此函数查找或创建
         
-        # 3. 使用这个ID获取所有相关的聊天记录
-        history = get_chat_history(user_id, consultation_id)
-        
-        # 4. 将ID和历史记录一起返回给前端
-        #    前端需要这个ID来进行后续的“继续对话”操作
+        # 3. 返回所有历史记录和最新会话的ID
         return jsonify({
-            "consultation_id": consultation_id,
+            "consultation_id": latest_consultation.id,
             "history": history
         }), 200
 
@@ -59,37 +55,115 @@ def get_chat_history_records():
         print(f"Error in /api/chat/history: {e}")
         return jsonify({"error_code": 500, "message": "服务器内部错误"}), 500
     
-@chat_bp.route('/continue', methods=['POST'])
+# @chat_bp.route('/continue', methods=['POST'])
+# @jwt_required()
+# def continue_chat():
+#     """在已存在的问诊中继续对话"""
+#     if not request.is_json:
+#         return jsonify({"msg": "Missing JSON in request"}), 400
+
+#     data = request.json
+#     consultation_id = data.get('consultation_id')
+#     question = data.get('question')
+
+#     if not consultation_id or not question:
+#         return jsonify({"msg": "Missing consultation_id or question parameter"}), 400
+
+#     try:
+#         user_id = get_jwt_identity()
+
+#         # --- 后续改进点 ---
+#         # TODO: 为了实现真正有记忆的多轮对话，在调用AI模型前，需要先获取历史聊天记录。
+#         # 1. 从数据库获取此 consultation_id 的历史对话。
+#         #    history = get_chat_history(user_id, consultation_id)
+#         # 2. 将历史对话和当前问题 `question` 组合成一个完整的上下文（Prompt）。
+#         #    full_prompt = build_prompt(history, question) # build_prompt 是一个需要您自己实现的辅助函数
+
+#         # 1. 调用(模拟的)LLM服务获取AI的回答
+#         # --- 后续改进点 ---
+#         # TODO: 当前调用是无状态的模拟。未来接入真实AI模型时，应传入完整的上下文。
+#         # 例如: ai_answer = llm_service.get_ai_response(full_prompt)
+        
+#         #这里可能不是直接调用llm，而是调用/api/chat/medical
+#         ai_answer = llm_service.get_ai_response(question)
+
+#         # 2. 调用service函数，将新的问答对追加到数据库
+#         result = add_chat_message_to_consultation(user_id, consultation_id, question, ai_answer)
+
+#         # 3. 检查service的返回结果
+#         if result is None:
+#             # 如果service返回None，说明问诊ID无效或用户权限不足
+#             return jsonify({"msg": "Invalid consultation_id or permission denied"}), 404
+        
+#         # 4. 成功后，只将AI的回答返回给前端
+#         return jsonify({"answer": ai_answer}), 200
+
+#     except Exception as e:
+#         print(f"Error in /api/chat/continue: {e}")
+#         return jsonify({"error_code": 500, "message": "服务器内部错误"}), 500
+
+# --- 将 /continue 改造为 /medical ---
+@chat_bp.route('/medical', methods=['POST']) # 1. 路由从 /continue 修改为 /medical
 @jwt_required()
-def continue_chat():
-    """在已存在的问诊中继续对话"""
+def chat_medical(): # 2. 函数名修改
+    """
+    在最新的问诊中继续对话。
+    这个接口会智能查找最新的会话ID并追加消息。
+    """
     if not request.is_json:
         return jsonify({"msg": "Missing JSON in request"}), 400
 
     data = request.json
-    consultation_id = data.get('consultation_id')
     question = data.get('question')
 
-    if not consultation_id or not question:
-        return jsonify({"msg": "Missing consultation_id or question parameter"}), 400
+    if not question:
+        return jsonify({"msg": "Missing question parameter"}), 400
 
     try:
         user_id = get_jwt_identity()
-
-        # 1. 调用(模拟的)LLM服务获取AI的回答
-        ai_answer = llm_service.get_ai_response(question)
-
-        # 2. 调用service函数，将新的问答对追加到数据库
-        result = add_chat_message_to_consultation(user_id, consultation_id, question, ai_answer)
-
-        # 3. 检查service的返回结果
-        if result is None:
-            # 如果service返回None，说明问诊ID无效或用户权限不足
-            return jsonify({"msg": "Invalid consultation_id or permission denied"}), 404
         
-        # 4. 成功后，只将AI的回答返回给前端
+        # 3. 不再从前端获取ID，而是从后端智能查找最新的会话(这里似乎前端也没有传回id只能自己查找了)
+        latest_consultation = find_or_create_main_ai_consultation(user_id)
+        consultation_id = latest_consultation.id
+
+        # 4. 后续逻辑保持不变：获取AI回答并存入数据库
+        ai_answer = llm_service.get_ai_response(question)
+        add_chat_message_to_consultation(user_id, consultation_id, question, ai_answer)
+        
         return jsonify({"answer": ai_answer}), 200
 
     except Exception as e:
-        print(f"Error in /api/chat/continue: {e}")
+        print(f"Error in /api/chat/medical: {e}")
         return jsonify({"error_code": 500, "message": "服务器内部错误"}), 500
+
+@chat_bp.route('/new', methods=['POST'])
+@jwt_required()
+def new_chat():
+    """通知后端开启新对话"""
+    try:
+        user_id = get_jwt_identity()
+        # 调用-service层来处理开启新会话的逻辑
+        new_chat_id = start_new_chat_session(user_id)
+        return jsonify({
+        "success": True,
+        "message": "新对话已创建",
+        "chatId": new_chat_id
+    }), 200
+    except Exception as e:
+        print(f"Error in /api/chat/new: {e}")
+    return jsonify({"error_code": 500, "message": "服务器内部错误，无法创建新对话"}), 500
+
+@chat_bp.route('/medical/record', methods=['POST'])
+@jwt_required()
+def generate_medical_record():
+    """根据用户的问诊历史记录生成结构化电子病历"""
+    try:
+        user_id = get_jwt_identity()
+        # 调用service层生成病历
+        medical_record = generate_medical_record_from_history(user_id)
+        if not medical_record:
+            return jsonify({"error_code": 404, "message": "无足够的问诊记录生成病历"}), 404
+        return jsonify(medical_record), 200
+    except Exception as e:
+        print(f"Error in /api/chat/medical/record: {e}")
+    return jsonify({"error_code": 500, "message": "生成病历失败，请稍后重试"}), 500
