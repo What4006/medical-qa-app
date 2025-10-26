@@ -48,6 +48,22 @@
       .message-appear { animation: fadeIn 0.4s cubic-bezier(0.22, 1, 0.36, 1); }
       .button-loading { animation: spin 1s linear infinite; }
       .shake { animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
+      .new-chat-separator {
+        display: flex;
+        align-items: center;
+        margin: 1rem 0;
+      }
+      .new-chat-separator::before, .new-chat-separator::after {
+        content: '';
+        flex: 1;
+        height: 1px;
+        background-color: #d1d5db;
+      }
+      .new-chat-separator span {
+        padding: 0 1rem;
+        color: #9ca3af;
+        font-size: 0.875rem;
+      }
       @keyframes fadeIn {
         from { opacity: 0; transform: translateY(10px); }
         to { opacity: 1; transform: translateY(0); }
@@ -87,25 +103,11 @@
         </div>
       </div>
 
-      <!-- 右侧区域 -->
-      <div class="flex items-center space-x-6 flex-shrink-0">
-        <button id="mobile-menu-btn" class="md:hidden text-neutral-700 hover:text-patient-500 transition-300">
-          <i class="fa fa-bars text-xl"></i>
+      <!-- 右侧区域：添加新对话按钮 -->
+      <div class="flex items-center">
+        <button id="new-chat-btn" class="flex items-center px-3 py-1.5 bg-patient-50 text-patient-600 rounded-full text-sm font-medium hover:bg-patient-100 transition-300">
+          <i class="fa fa-plus-circle mr-1.5"></i>新对话
         </button>
-
-        <div class="hidden md:flex items-center space-x-6">
-          <div class="relative">
-            <button class="text-neutral-600 hover:text-patient-500 transition-300">
-              <i class="fa fa-bell text-xl"></i>
-              <span class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-danger text-white text-xs rounded-full flex items-center justify-center"></span>
-            </button>
-          </div>
-          <div>
-            <button class="text-neutral-700 hover:text-patient-500 transition-300">
-              <i class="fa fa-cog text-2xl"></i>
-            </button>
-          </div>
-        </div>
       </div>
     </div>
 
@@ -142,7 +144,18 @@
     <div class="container mx-auto px-4 py-3">
       <!-- 文件预览区 -->
       <div id="file-preview-list" class="flex gap-2 mb-2"></div>
-      <div class="flex items-end gap-3">
+
+      <!-- 新增的功能按钮区域 -->
+      <div class="flex items-center gap-3 mb-3">
+        <button id="generate-medical-record" class="px-4 py-2 bg-patient-500 text-white rounded-lg text-sm font-medium hover:bg-patient-600 transition-300 flex items-center shadow-sm">
+          <i class="fa fa-file-text-o mr-2"></i>生成病历
+        </button>
+        <button id="more-functions" class="px-4 py-2 bg-neutral-100 text-neutral-700 rounded-lg text-sm font-medium hover:bg-neutral-200 transition-300 flex items-center shadow-sm">
+          <i class="fa fa-ellipsis-h mr-2"></i>更多功能
+        </button>
+      </div>
+    <div class="flex items-end gap-3">
+
         <!-- 附件按钮 -->
         <button id="attach-btn" type="button" class="w-10 h-10 rounded-full bg-doubao-bg flex items-center justify-center text-neutral-600 hover:bg-neutral-200 transition-300">
           <i class="fa fa-paperclip"></i>
@@ -199,7 +212,22 @@
       const attachBtn = document.getElementById('attach-btn');
       const fileInput = document.getElementById('file-input');
       const filePreviewList = document.getElementById('file-preview-list');
+      const newChatBtn = document.getElementById('new-chat-btn');
+      const generateRecordBtn = document.getElementById('generate-medical-record');
+      if (generateRecordBtn) {
+        generateRecordBtn.addEventListener('click', handleGenerateMedicalRecord);
+      }
       let selectedFiles = [];
+
+      // 确保新对话按钮正确绑定事件
+      if (newChatBtn) {
+        // 先移除可能存在的旧事件绑定
+        newChatBtn.removeEventListener('click', startNewChat);
+        // 添加新的事件绑定
+        newChatBtn.addEventListener('click', startNewChat);
+      } else {
+        console.error('未找到新对话按钮元素');
+      }
 
       attachBtn.addEventListener('click', () => fileInput.click());
 
@@ -409,8 +437,14 @@
             <p class="text-xs text-neutral-400 mt-1">${timeStr}</p>
           </div>
         `;
-        chatMessages.appendChild(aiMsgDiv);
-        scrollToLatestMessage();
+        
+        // 确保chatMessages存在再添加元素
+        if (chatMessages) {
+          chatMessages.appendChild(aiMsgDiv);
+          scrollToLatestMessage();
+        } else {
+          console.error('chatMessages元素不存在，无法添加AI欢迎消息');
+        }
       }
 
       // 11. 添加“继续咨询”的AI提示消息
@@ -434,22 +468,83 @@
         scrollToLatestMessage();
       }
 
-      // 12. 加载历史聊天记录
+      // 12. 渲染新对话分隔线
+      function renderNewChatSeparator() {
+        const separator = document.createElement('div');
+        separator.className = 'new-chat-separator message-appear';
+        separator.innerHTML = '<span>新对话</span>';
+        
+        // 确保chatMessages存在再添加元素
+        if (chatMessages) {
+          chatMessages.appendChild(separator);
+          return separator;
+        } else {
+          console.error('chatMessages元素不存在，无法添加新对话分隔线');
+          return null;
+        }
+      }
+
+      // 13. 新对话功能 - 修复版本
+      async function startNewChat() {
+        console.log('点击了新对话按钮');
+        
+        // 确保chatMessages元素存在
+        if (!chatMessages) {
+          console.error('chatMessages元素不存在，无法创建新对话');
+          return;
+        }
+        
+        
+        try {
+          // 通知后端开启新对话
+          await apiService.startNewMedicalChat();
+      
+          // 移除加载提示（如果存在）
+          if (historyLoading && historyLoading.parentNode) {
+            historyLoading.parentNode.removeChild(historyLoading);
+          }
+      
+          // 在最新消息下方添加新对话分隔线
+          const separator = renderNewChatSeparator();
+          if (!separator) {
+            console.error('创建新对话分隔线失败');
+          }
+      
+          // AI再次发送打招呼消息
+          setTimeout(() => {
+            addInitialAiMessage();
+          }, 100); // 短暂延迟，确保分隔线先渲染
+          
+          // 清空输入框和文件选择
+          messageInput.value = '';
+          adjustTextareaHeight();
+          filePreviewList.innerHTML = ''; 
+          selectedFiles = [];
+        } catch (error) {
+          console.error('开启新对话失败:', error.message);
+          renderErrorMsg(`开启新对话失败: ${error.message}`);
+        }
+      }
+
+      // 14. 加载历史聊天记录
       async function loadHistoryChats() {
         try {
           // 调用API获取历史对话
-          const historyChats = await apiService.getMedicalChatHistory();
+          const responseData = await apiService.getMedicalChatHistory();
           
           // 移除加载提示
           if (historyLoading && historyLoading.parentNode) {
             historyLoading.parentNode.removeChild(historyLoading);
           }
           
-          // 验证返回数据是否为数组
-          if (!Array.isArray(historyChats)) {
+          // 验证返回的数据是对象，并且包含 history 数组
+          if (typeof responseData !== 'object' || !Array.isArray(responseData.history)) {
             throw new Error('历史记录格式错误');
           }
           
+          // 从返回的对象中提取真正的历史记录数组
+          const historyChats = responseData.history;
+
           if (historyChats.length > 0) {
             let lastDate = null;
             
@@ -500,10 +595,10 @@
         }
       }
 
-      // 13. 初始化：加载历史记录
+      // 15. 初始化：加载历史记录
       loadHistoryChats();
 
-      // 14. 核心：消息发送功能
+      // 16. 核心：消息发送功能
       async function sendMessage() {
         const messageContent = messageInput.value ? messageInput.value.trim() : '';
         if (!messageContent && selectedFiles.length === 0) {
@@ -546,7 +641,7 @@
           } else {
             aiAnswer = await apiService.sendMedicalQuery(messageContent);
           }
-          await apiService.createMedicalRecord(messageContent, aiAnswer);
+          //await apiService.createMedicalRecord(messageContent, aiAnswer);
           renderAiMessage(aiAnswer, now);
           if (aiAnswer.length > 200) setTimeout(addAiPromptMessage, 1000);
         } catch (error) {
@@ -562,7 +657,7 @@
         }
       }
 
-      // 15. 绑定发送事件（多种触发方式）
+      // 17. 绑定发送事件（多种触发方式）
       // 方式1：点击发送按钮
       sendButton.addEventListener('click', sendMessage);
 
@@ -574,7 +669,89 @@
         }
       });
 
-      // 16. 防XSS攻击工具函数
+      /**
+       * 处理生成病历按钮点击事件
+       */
+      async function handleGenerateMedicalRecord() {
+        const generateBtn = document.getElementById('generate-medical-record');
+        
+        // 显示加载状态
+        generateBtn.disabled = true;
+        generateBtn.innerHTML = '<i class="fa fa-circle-o-notch button-loading mr-2"></i>生成中...';
+        
+        try {
+          // 调用API生成病历
+          const medicalRecord = await apiService.generateMedicalRecord();
+          
+          // 验证返回的病历格式
+          if (!medicalRecord || typeof medicalRecord !== 'object') {
+            throw new Error('生成的病历格式不正确');
+          }
+          
+          // 渲染AI正在生成病历的提示消息
+          const now = new Date();
+          renderAiMessage('正在根据您的问诊历史生成病历...', now);
+          
+          // 直接生成并显示病历（移除模拟思考的延迟）
+          // 构建病历HTML
+          let recordHtml = `
+            <div class="bg-white p-4 rounded-lg border border-neutral-200 mb-3">
+              <h4 class="font-semibold text-neutral-800 mb-3 text-center">电子病历</h4>
+          `;
+          
+          // 遍历病历字段生成内容
+          const fields = [
+            {key: '主诉', value: medicalRecord.主诉},
+            {key: '现病史', value: medicalRecord.现病史},
+            {key: '既往史', value: medicalRecord.既往史},
+            {key: '个人史', value: medicalRecord.个人史},
+            {key: '家族史', value: medicalRecord.家族史},
+            {key: '诊断', value: medicalRecord.诊断}
+          ];
+          
+          fields.forEach(field => {
+            if (field.value) {
+              recordHtml += `
+                <div class="mb-2">
+                  <span class="text-patient-600 font-medium">${field.key}：</span>
+                  <span class="text-neutral-700">${escapeHtml(field.value)}</span>
+                </div>
+              `;
+            }
+          });
+          
+          recordHtml += `</div>`;
+          
+          // 渲染病历内容
+          const recordDate = new Date();
+          const aiMsgDiv = document.createElement('div');
+          aiMsgDiv.className = 'flex items-start message-appear';
+          aiMsgDiv.innerHTML = `
+            <div class="w-9 h-9 rounded-full bg-gradient-to-br from-patient-500 to-doctor-500 flex items-center justify-center flex-shrink-0 mr-3">
+              <i class="fa fa-user-md text-white"></i>
+            </div>
+            <div class="max-w-[80%]">
+              <div class="bg-patient-50 p-4 rounded-lg rounded-tl-none border border-patient-100">
+                <p>已根据您的问诊记录生成病历如下：</p>
+                ${recordHtml}
+                <p class="text-sm text-neutral-500 mt-3">注：此病历仅供参考，具体诊断请以医生面诊结果为准。</p>
+              </div>
+              <p class="text-xs text-neutral-400 mt-1">${formatTime(recordDate)}</p>
+            </div>
+          `;
+          
+          chatMessages.appendChild(aiMsgDiv);
+          scrollToLatestMessage();
+          
+        } catch (error) {
+          renderErrorMsg(`生成病历失败：${error.message}`);
+        } finally {
+          // 恢复按钮状态
+          generateBtn.disabled = false;
+          generateBtn.innerHTML = '<i class="fa fa-file-text-o mr-2"></i>生成病历';
+        }
+      }
+      // 18. 防XSS攻击工具函数
       function escapeHtml(text) {
         const div = document.createElement('div');
         div.textContent = text;

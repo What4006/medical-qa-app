@@ -104,7 +104,7 @@ tailwind.config = {
       <div class="mb-8 bg-gradient-to-r from-patient-500 to-patient-700 rounded-2xl p-6 text-white shadow-lg">
         <div>
           <h2 class="text-[clamp(1.25rem,3vw,1.75rem)] font-bold mb-2">
-            您好，<span id="user-nickname" class="skeleton inline-block w-24 h-7"></span>
+            您好，<span id="user-nickname" class="skeleton inline-block h-7"></span>
           </h2>
           <p class="text-patient-100 max-w-md">今天感觉怎么样？AI助手和专业医生随时为您提供帮助</p>
         </div>
@@ -242,7 +242,7 @@ tailwind.config = {
         });
     }
 
-    // 渲染最近的问诊记录 - 已根据API文档更新
+    // 渲染最近的问诊记录
     function renderRecentConsultation(record) {
       const container = document.getElementById('recent-consultation-container');
       
@@ -260,15 +260,14 @@ tailwind.config = {
       if (record.type === 'ai') {
         // 使用"AI"文字作为头像图标
         iconHtml = '<div class="ai-initial">AI</div>';
-        typeText = 'AI问诊';
+        typeText = `${record.title}`;
       } else {
         iconHtml = '<i class="fa fa-user-md text-doctor-600"></i>';
-        typeText = `医生问诊 · ${record.department || ''}`;
+        typeText = `${record.title} · ${record.department}`;
       }
       
       // 创建记录卡片
-      const card = document.createElement('a');
-      card.href = `patient_ai.html?recordId=${record.id}`;
+      const card = document.createElement('div');
       card.className = 'block p-4 hover:bg-neutral-50 transition-300 clickable-card';
       card.innerHTML = `
         <div class="flex justify-between items-start mb-2">
@@ -277,18 +276,13 @@ tailwind.config = {
               ${iconHtml}
             </div>
             <div>
-              <h3 class="font-medium text-neutral-800">${record.title || typeText}</h3>
-              <p class="text-neutral-500 text-sm">
-                ${record.date} ${record.time} 
-                ${record.doctor ? '· ' + record.doctor : ''}
-              </p>
+              <h3 class="font-medium text-neutral-800">${typeText}</h3>
+              <p class="text-neutral-500 text-sm">${record.date} ${record.time} ${record.doctor ? '· ' + record.doctor : ''}</p>
             </div>
           </div>
-          <span class="px-2 py-1 bg-patient-100 text-patient-700 text-xs rounded-full">
-            ${record.status === 'completed' ? '已完成' : '进行中'}
-          </span>
+          <span class="px-2 py-1 bg-patient-100 text-patient-700 text-xs rounded-full">${record.status === 'completed' ? '已完成' : '进行中'}</span>
         </div>
-        <p class="text-neutral-700 ml-13 line-clamp-2">${record.summary}</p>
+        <p class="text-neutral-700 ml-13">${record.summary}</p>
       `;
       
       container.appendChild(card);

@@ -1,0 +1,9 @@
+# 忽略 Python 缓存文件
+__pycache__/
+*.pyc
+
+# 核心：忽略 .env 文件！
+.env
+
+# 也可以忽略 VSCode 的设置
+.vscode/
