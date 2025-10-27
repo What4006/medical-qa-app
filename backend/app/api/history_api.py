@@ -47,7 +47,12 @@ def get_all_history():
     sorted_records=sorted(all_records,key=lambda r: (r.get('date',''),r.get('time','')),reverse=True)
     return jsonify(sorted_records),200
 
-# 将 /api/history/create 路由添加到现有的 history_bp 蓝图中
+# -------------------------------------------------
+#注意：经过对前端文件await apiService.createMedicalRecord(messageContent, aiAnswer);改为注释
+#这个API目前并没有被前端调用，原因时逻辑上对AIconsultationModel的操作现在被归到create_ai_consultation_record
+#函数里，create_ai_consultation_record的逻辑是对AIconsultationModel进行内容的增添，而不是此api的新建操作。
+#因此，此API不会被使用，但是我先保留着，以备不时之需。
+#-------------------------------------------------
 @history_bp.route('/create', methods=['POST'])
 @jwt_required()
 def create_history_record():
@@ -75,3 +80,4 @@ def create_history_record():
     except Exception as e:
         print(f"Error in /api/history/create: {e}")
         return jsonify({"error_code": 500, "message": "服务器内部错误"}), 500
+# -------------------------------------------------

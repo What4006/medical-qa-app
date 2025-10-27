@@ -93,7 +93,7 @@ def get_chat_history(user_id):
         
     return chat_pairs
 
-#这个函数我感觉肯冗余了，但是总体可以运行，所以先不删了吧:)
+#1.用户首次使用或无记录时被调用 2.通过特定 API 直接调用时: POST /api/history/create
 def create_ai_consultation_record(user_id, question, answer):
     """
     创建一个新的AI问诊记录，并保存第一条问答对。
@@ -150,7 +150,9 @@ def add_chat_message_to_consultation(user_id, consultation_id, question, answer)
         sender_type='ai',
         content=answer
     )
-    
+    #-----------------------------------------------
+    #这里应当增加一个更新AIConsultationModel实例的功能
+    #-----------------------------------------------
     # 3. 将新记录添加到数据库并提交
     db.session.add_all([user_message, ai_message])
     db.session.commit()

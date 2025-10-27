@@ -55,54 +55,6 @@ def get_chat_history_records():
         print(f"Error in /api/chat/history: {e}")
         return jsonify({"error_code": 500, "message": "服务器内部错误"}), 500
     
-# @chat_bp.route('/continue', methods=['POST'])
-# @jwt_required()
-# def continue_chat():
-#     """在已存在的问诊中继续对话"""
-#     if not request.is_json:
-#         return jsonify({"msg": "Missing JSON in request"}), 400
-
-#     data = request.json
-#     consultation_id = data.get('consultation_id')
-#     question = data.get('question')
-
-#     if not consultation_id or not question:
-#         return jsonify({"msg": "Missing consultation_id or question parameter"}), 400
-
-#     try:
-#         user_id = get_jwt_identity()
-
-#         # --- 后续改进点 ---
-#         # TODO: 为了实现真正有记忆的多轮对话，在调用AI模型前，需要先获取历史聊天记录。
-#         # 1. 从数据库获取此 consultation_id 的历史对话。
-#         #    history = get_chat_history(user_id, consultation_id)
-#         # 2. 将历史对话和当前问题 `question` 组合成一个完整的上下文（Prompt）。
-#         #    full_prompt = build_prompt(history, question) # build_prompt 是一个需要您自己实现的辅助函数
-
-#         # 1. 调用(模拟的)LLM服务获取AI的回答
-#         # --- 后续改进点 ---
-#         # TODO: 当前调用是无状态的模拟。未来接入真实AI模型时，应传入完整的上下文。
-#         # 例如: ai_answer = llm_service.get_ai_response(full_prompt)
-        
-#         #这里可能不是直接调用llm，而是调用/api/chat/medical
-#         ai_answer = llm_service.get_ai_response(question)
-
-#         # 2. 调用service函数，将新的问答对追加到数据库
-#         result = add_chat_message_to_consultation(user_id, consultation_id, question, ai_answer)
-
-#         # 3. 检查service的返回结果
-#         if result is None:
-#             # 如果service返回None，说明问诊ID无效或用户权限不足
-#             return jsonify({"msg": "Invalid consultation_id or permission denied"}), 404
-        
-#         # 4. 成功后，只将AI的回答返回给前端
-#         return jsonify({"answer": ai_answer}), 200
-
-#     except Exception as e:
-#         print(f"Error in /api/chat/continue: {e}")
-#         return jsonify({"error_code": 500, "message": "服务器内部错误"}), 500
-
-# --- 将 /continue 改造为 /medical ---
 @chat_bp.route('/medical', methods=['POST']) # 1. 路由从 /continue 修改为 /medical
 @jwt_required()
 def chat_medical(): # 2. 函数名修改
