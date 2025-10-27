@@ -1,6 +1,7 @@
 #9.23——用于  获取最近问诊记录  的API--w4006
 from ..models.consultation_model import AIConsultationModel, DoctorConsultationModel, ChatMessageModel
 from ..core.extensions import db
+from ..models.medical_record_model import MedicalRecordModel
 from datetime import datetime
 
 def get_recent_consultation(user_id):
@@ -152,6 +153,7 @@ def add_chat_message_to_consultation(user_id, consultation_id, question, answer)
     )
     #-----------------------------------------------
     #这里应当增加一个更新AIConsultationModel实例的功能
+
     #-----------------------------------------------
     # 3. 将新记录添加到数据库并提交
     db.session.add_all([user_message, ai_message])
@@ -189,18 +191,45 @@ def generate_medical_record_from_history(user_id):
     if not consultation or not consultation.chat_messages:
         return None
 
-    # (模拟) 这里您可以将聊天记录拼接起来，发送给另一个AI模型进行处理
+    # --- (模拟) 生成病历字典 ---
+    # 真实场景：调用 AI 模型处理 chat_history 当然这里具体怎么进行取决于ai的返回内容
     # chat_history = " ".join([f"{msg.sender_type}: {msg.content}" for msg in consultation.chat_messages])
-    # generated_record = llm_service.generate_record(chat_history)
-    # return generated_record
+    # generated_record_dict = llm_service.generate_record(chat_history) # 假设返回字典
 
-    # 为演示，我们返回一个符合文档格式的静态病历
-    return {
+   # 当前使用静态模拟数据
+    generated_record_dict = {
         "主诉": "发热、咳嗽 3 天",
         "现病史": "患者 3 天前无明显诱因出现发热，体温最高 38.5℃，伴咳嗽，咳少量白色黏痰，无胸痛、呼吸困难等症状。自行服用感冒药效果不佳，遂咨询。",
         "既往史": "高血压病史 5 年，规律服用硝苯地平控释片，血压控制良好。否认糖尿病、冠心病等慢性病史。",
         "个人史": "吸烟 20 年，每日 10 支，未戒烟。少量饮酒。",
         "家族史": "父亲患有高血压，母亲健康。",
         "诊断": "急性上呼吸道感染（病毒性）",
-        "createdAt": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+        # "createdAt" 通常由数据库自动生成或在保存时设置，这里可以先移除
     }
+    try:
+        new_medical_record = MedicalRecordModel(
+            patient_id=user_id, # 关联病人 ID
+            chief_complaint=generated_record_dict.get("主诉"),
+            history_present_illness=generated_record_dict.get("现病史"),
+            past_medical_history=generated_record_dict.get("既往史"),
+            personal_history=generated_record_dict.get("个人史"),
+            family_history=generated_record_dict.get("家族史"),
+            diagnosis=generated_record_dict.get("诊断")
+            # created_at 由数据库 default=datetime.utcnow 自动处理
+        )
+        db.session.add(new_medical_record)
+        db.session.commit()
+        
+        # 返回保存后的 MedicalRecordModel 对象 (包含数据库生成的 id 和 created_at)
+        # 或者您可以选择只返回原始的字典，取决于 API 需要什么格式
+        # return new_medical_record 
+        
+        # 为了符合 API 文档 返回原始字典格式 (并添加 createdAt)
+        generated_record_dict["id"] = str(new_medical_record.id) # 添加数据库生成的 ID
+        generated_record_dict["createdAt"] = new_medical_record.created_at.strftime("%Y-%m-%d %H:%M:%S") # 添加数据库生成的时间
+        return generated_record_dict
+
+    except Exception as e:
+        db.session.rollback() # 保存失败时回滚
+        print(f"Error saving medical record for user {user_id}: {e}")
+        return None # 返回 None 表示保存失败

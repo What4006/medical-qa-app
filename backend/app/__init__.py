@@ -35,6 +35,6 @@ def create_app(config_name='default'):
 
     # 4. 导入数据库模型，以便 Flask-Migrate 能够检测到它们
     # 这是让 `flask db migrate` 正常工作的关键一步
-    from .models import user_model, consultation_model, appointment_model, review_model
+    from .models import user_model, consultation_model, appointment_model, review_model, medical_record_model
 
     return app
