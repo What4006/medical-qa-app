@@ -16,6 +16,8 @@ class UserModel(db.Model):
     gender = db.Column(db.String(10), comment='性别')
     birth_date = db.Column(db.Date, comment='出生日期') 
     basic_medical_history = db.Column(db.Text, comment='基础疾病史')
+    personal_history = db.Column(db.Text, nullable=True, comment='个人史 ')
+    family_history = db.Column(db.Text, nullable=True, comment='家族史')
     created_at = db.Column(db.DateTime, default=datetime.utcnow, comment='账户创建时间')
 
     # --- 新增一个属性，用于动态计算年龄 ---

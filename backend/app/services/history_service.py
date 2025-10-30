@@ -2,8 +2,10 @@
 from ..models.consultation_model import AIConsultationModel, DoctorConsultationModel, ChatMessageModel
 from ..core.extensions import db
 from ..models.medical_record_model import MedicalRecordModel
+from ..services import llm_service
+from ..models.user_model import UserModel
+import json
 from datetime import datetime
-
 def get_recent_consultation(user_id):
     recent_record_ai=AIConsultationModel.query.filter_by(patient_id=user_id).order_by(AIConsultationModel.created_at.desc()).first()
     recent_record_doctor =DoctorConsultationModel.query.filter_by(patient_id=user_id).order_by(DoctorConsultationModel.created_at.desc()).first()
@@ -154,6 +156,21 @@ def add_chat_message_to_consultation(user_id, consultation_id, question, answer)
     #-----------------------------------------------
     #这里应当增加一个更新AIConsultationModel实例的功能
 
+    # 1. 更新摘要 (ai_analysis)：使用最新的AI回答作为问诊摘要
+    consultation.ai_analysis = answer
+    
+    # 2. 更新诊断/标题 (ai_diagnosis)：使用最新的用户问题作为简短标题/诊断
+    consultation.ai_diagnosis = question[:50] 
+    
+    # 3. 追加症状描述 (symptom_description)：将新问题追加到症状描述中
+    if consultation.symptom_description:
+        consultation.symptom_description += f"\n\n[User]: {question}"
+    else:
+        consultation.symptom_description = f"[User]: {question}"
+        
+    # 4. 更新状态 (status)：确保状态为 'completed' (表示此轮问答已完成)
+    consultation.status = 'completed'
+
     #-----------------------------------------------
     # 3. 将新记录添加到数据库并提交
     db.session.add_all([user_message, ai_message])
@@ -181,55 +198,86 @@ def start_new_chat_session(user_id):
 
 def generate_medical_record_from_history(user_id):
     """
-    根据用户的问诊历史生成结构化电子病历。
-    注意：这是一个模拟实现。在真实场景中，您会调用一个专门的大语言模型来处理文本摘要和信息提取。
+    根据用户的 patient_name 调用 LLM 服务生成结构化电子病历。
+    (已修改为调用 llm_service.py)
     """
-    # 找到该用户最近的一次问诊记录
-    consultation = AIConsultationModel.query.filter_by(patient_id=user_id).order_by(AIConsultationModel.created_at.desc()).first()
-
-    # 如果没有问诊记录或记录里没有聊天内容，则无法生成病历
-    if not consultation or not consultation.chat_messages:
+    
+    # --- 1. (新增) 获取 patient_name ---
+    # 你的 llm_service.py (llm_service.py) 需要 patient_name
+    user = UserModel.query.get(user_id)
+    if not user:
+        print(f"Error in history_service: User not found for ID {user_id}")
+        return None
+    
+    patient_name = user.full_name
+    if not patient_name:
+        print(f"Error in history_service: User {user_id} does not have a full_name set.")
+        # FastAPI (Fastapi.txt) 明确要求 patient_name
         return None
 
-    # --- (模拟) 生成病历字典 ---
-    # 真实场景：调用 AI 模型处理 chat_history 当然这里具体怎么进行取决于ai的返回内容
-    # chat_history = " ".join([f"{msg.sender_type}: {msg.content}" for msg in consultation.chat_messages])
-    # generated_record_dict = llm_service.generate_record(chat_history) # 假设返回字典
-
-   # 当前使用静态模拟数据
-    generated_record_dict = {
-        "主诉": "发热、咳嗽 3 天",
-        "现病史": "患者 3 天前无明显诱因出现发热，体温最高 38.5℃，伴咳嗽，咳少量白色黏痰，无胸痛、呼吸困难等症状。自行服用感冒药效果不佳，遂咨询。",
-        "既往史": "高血压病史 5 年，规律服用硝苯地平控释片，血压控制良好。否认糖尿病、冠心病等慢性病史。",
-        "个人史": "吸烟 20 年，每日 10 支，未戒烟。少量饮酒。",
-        "家族史": "父亲患有高血压，母亲健康。",
-        "诊断": "急性上呼吸道感染（病毒性）",
-        # "createdAt" 通常由数据库自动生成或在保存时设置，这里可以先移除
-    }
+    # --- 2. (修改) 调用 llm_service ---
     try:
+        # 调用 llm_service.py (llm_service.py) 中你写好的函数
+        print(f"--- Calling llm_service.generate_structured_medical_record for {patient_name} ---")
+        generated_record_dict = llm_service.generate_structured_medical_record(patient_name)
+    
+    except Exception as e:
+        # 捕获 llm_service (llm_service.py) 抛出的异常 (例如连接失败或FastAPI返回错误)
+        print(f"Error calling llm_service for user {user_id} ({patient_name}): {e}")
+        return None # 返回 None 表示生成失败
+
+    if not generated_record_dict or "patient_name" not in generated_record_dict:
+        print(f"Error: llm_service did not return a valid record dictionary.")
+        return None
+
+    # --- 3. (关键修改) 组合数据并保存到 Flask 数据库 ---
+    try:
+        # 从 AI (FastAPI) (Fastapi.txt) 获取动态信息
+        ai_summary = generated_record_dict.get("summary", "暂无主诉")
+        ai_encounters = generated_record_dict.get("encounters", [])
+        
+        # 从 encounters 提取简单的诊断
+        primary_diagnosis = "暂无诊断"
+        history_present_illness = "暂无现病史"
+        
+        if ai_encounters:
+            first_encounter = ai_encounters[0]
+            primary_diagnosis = first_encounter.get("diagnosis", "暂无诊断")
+            history_present_illness = json.dumps(ai_encounters, ensure_ascii=False)
+
+        # --- 替换占位符 ---
         new_medical_record = MedicalRecordModel(
-            patient_id=user_id, # 关联病人 ID
-            chief_complaint=generated_record_dict.get("主诉"),
-            history_present_illness=generated_record_dict.get("现病史"),
-            past_medical_history=generated_record_dict.get("既往史"),
-            personal_history=generated_record_dict.get("个人史"),
-            family_history=generated_record_dict.get("家族史"),
-            diagnosis=generated_record_dict.get("诊断")
-            # created_at 由数据库 default=datetime.utcnow 自动处理
+            patient_id=user_id, 
+            
+            # 1. AI 生成的动态信息
+            chief_complaint=ai_summary, # 使用FastAPI的summary
+            history_present_illness=history_present_illness, # 存储 encounters 详情
+            diagnosis=primary_diagnosis, # 使用第一个 encounter 的诊断
+            
+            # 2. 从 UserModel 提取的静态信息
+            past_medical_history=user.basic_medical_history or "患者未提供", 
+            personal_history=user.personal_history or "患者未提供", 
+            family_history=user.family_history or "患者未提供"
         )
+        
         db.session.add(new_medical_record)
         db.session.commit()
         
-        # 返回保存后的 MedicalRecordModel 对象 (包含数据库生成的 id 和 created_at)
-        # 或者您可以选择只返回原始的字典，取决于 API 需要什么格式
-        # return new_medical_record 
-        
-        # 为了符合 API 文档 返回原始字典格式 (并添加 createdAt)
-        generated_record_dict["id"] = str(new_medical_record.id) # 添加数据库生成的 ID
-        generated_record_dict["createdAt"] = new_medical_record.created_at.strftime("%Y-%m-%d %H:%M:%S") # 添加数据库生成的时间
-        return generated_record_dict
+        # --- 4. (修改) 返回符合 API 文档 (大创文档xin.docx) 的字典 ---
+        # [cite_start]你的Flask API (大创文档xin.docx) 需要返回中文键 [cite: 532]
+        final_record_dict = {
+            "id": str(new_medical_record.id),
+            "主诉": new_medical_record.chief_complaint,
+            "现病史": new_medical_record.history_present_illness,
+            "既往史": new_medical_record.past_medical_history,
+            "个人史": new_medical_record.personal_history,
+            "家族史": new_medical_record.family_history,
+            "诊断": new_medical_record.diagnosis,
+            "createdAt": new_medical_record.created_at.strftime("%Y-%m-%d %H:%M:%S")
+        }
+        return final_record_dict
 
     except Exception as e:
         db.session.rollback() # 保存失败时回滚
-        print(f"Error saving medical record for user {user_id}: {e}")
+        print(f"Error saving medical record to Flask DB for user {user_id}: {e}")
         return None # 返回 None 表示保存失败
