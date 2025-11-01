@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>医智通 - 预约医生</title>
+  <!-- 基础样式与脚本 -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+
+  <!-- Tailwind配置 -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            patient: { // 病人端主色：淡蓝色
+              50: '#f0f7ff', 100: '#e0efff', 200: '#b9ddff', 
+              300: '#7cc3fc', 400: '#3d9fe8', 500: '#0a84e3', 
+              600: '#0066c7', 700: '#0052a3', 800: '#004382'
+            },
+            doctor: { // 医护端主色：淡青色
+              50: '#f0fdfa', 100: '#ccfbf1', 200: '#99f6e4', 
+              300: '#5eead4', 400: '#2dd4bf', 500: '#14b8a6', 
+              600: '#0d9488', 700: '#0f766e', 800: '#115e59'
+            },
+            success: '#10b981', warning: '#f59e0b', danger: '#ef4444'
+          },
+          fontFamily: {
+            sans: ['Microsoft YaHei', 'Source Han Sans CN', 'sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+
+  <style type="text/tailwindcss">
+    @layer utilities {
+      .content-auto { content-visibility: auto; }
+      .transition-300 { transition: all 300ms ease; }
+      .scrollbar-hide::-webkit-scrollbar { display: none; }
+      .backdrop-blur { backdrop-filter: blur(8px); }
+      .clickable-card { cursor: pointer; }
+      .ai-initial { @apply font-bold text-sm; }
+      .skeleton { @apply bg-neutral-200 animate-pulse rounded; }
+      .badge-pill { @apply inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-medium; }
+      .record-checkbox { @apply transition-300; }
+      .dropdown-item { @apply px-3 py-2 rounded-lg text-sm hover:bg-patient-50 transition-300 cursor-pointer; }
+      .dropdown-item.active { @apply bg-patient-100 text-patient-700 font-medium; }
+    }
+  </style>
+</head>
+<body class="bg-neutral-50 min-h-screen flex flex-col">
+  <!-- 顶部导航栏 -->
+  <header class="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur shadow-sm transition-300">
+    <div class="container mx-auto px-4 py-3 flex items-center justify-between">
+      <!-- 返回按钮和标题 -->
+      <div class="flex items-center space-x-3">
+        <button class="text-neutral-700 hover:text-patient-500 transition-300" onclick="history.back()">
+          <i class="fa fa-arrow-left text-xl"></i>
+        </button>
+        <h1 class="text-xl font-bold text-neutral-800">预约医生</h1>
+      </div>
+    </div>
+  </header>
+
+  <!-- 主内容区 -->
+  <main class="flex-1 pt-16">
+    <div class="container mx-auto px-4 py-6">
+      <!-- 科室选择区域 -->
+      <div class="mb-6 relative">
+        <!-- 标题和下拉按钮 -->
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-lg font-bold text-neutral-800">选择科室</h2>
+          <button id="department-dropdown-btn" class="text-neutral-700 hover:text-patient-500 transition-300 flex items-center bg-white border border-neutral-200 rounded-lg px-3 py-1.5">
+            <span class="mr-1 text-sm">全部科室</span>
+            <i class="fa fa-chevron-down text-xs"></i>
+          </button>
+        </div>
+        
+        <!-- 科室下拉菜单 -->
+        <div id="department-dropdown" class="hidden absolute z-40 bg-white rounded-xl shadow-lg mt-1 w-full left-0 right-0 px-4 py-3 max-h-64 overflow-y-auto scrollbar-hide">
+          <div class="grid grid-cols-3 gap-2">
+            <!-- 科室选项将通过JavaScript动态生成 -->
+          </div>
+        </div>
+      </div>
+
+      <!-- 医生列表 -->
+      <div class="mb-8">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-xl font-bold text-neutral-800" id="doctor-list-title">全部医生</h2>
+        </div>
+
+        <!-- 医生卡片列表 -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="doctors-container">
+          <!-- 医生卡片将通过JavaScript动态生成 -->
+        </div>
+
+        <!-- 加载状态 -->
+        <div id="loading-doctors" class="py-12 text-center">
+          <i class="fa fa-circle-o-notch fa-spin text-patient-500 text-2xl mb-3"></i>
+          <p class="text-neutral-500">加载医生信息中...</p>
+        </div>
+
+        <!-- 空状态 (默认隐藏) -->
+        <div id="empty-doctors" class="hidden py-12 text-center">
+          <div class="w-16 h-16 mx-auto bg-neutral-100 rounded-full flex items-center justify-center mb-3">
+            <i class="fa fa-user-md text-neutral-400 text-2xl"></i>
+          </div>
+          <p class="text-neutral-500">当前科室暂无医生信息</p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- 预约弹窗 (默认隐藏) -->
+  <div id="appointment-modal" class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center p-4">
+    <div class="bg-white rounded-2xl w-full max-w-md mx-auto overflow-hidden shadow-2xl transform transition-all">
+      <div class="p-6 border-b border-neutral-200">
+        <div class="flex items-center justify-between">
+          <h3 class="text-xl font-bold text-neutral-800">预约医生</h3>
+          <button id="close-modal" class="text-neutral-500 hover:text-neutral-700 transition-300">
+            <i class="fa fa-times text-xl"></i>
+          </button>
+        </div>
+        <div class="flex items-center mt-4">
+          <div class="w-12 h-12 rounded-full bg-doctor-100 flex items-center justify-center mr-3">
+            <i class="fa fa-user-md text-doctor-600 text-xl" id="modal-doctor-icon"></i>
+          </div>
+          <div>
+            <h4 class="font-medium text-neutral-800" id="modal-doctor-name"></h4>
+            <p class="text-neutral-500 text-sm" id="modal-doctor-department"></p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="p-6">
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-neutral-700 mb-1">预约日期</label>
+          <div class="grid grid-cols-3 gap-2">
+            <button class="date-btn py-2 border border-neutral-200 rounded-lg text-center text-sm hover:border-patient-500 transition-300"></button>
+            <button class="date-btn py-2 border border-neutral-200 rounded-lg text-center text-sm hover:border-patient-500 transition-300"></button>
+            <button class="date-btn py-2 border border-neutral-200 rounded-lg text-center text-sm hover:border-patient-500 transition-300"></button>
+          </div>
+        </div>
+        
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-neutral-700 mb-1">预约时段</label>
+          <div class="grid grid-cols-3 gap-2">
+            <button class="time-btn py-2 border border-neutral-200 rounded-lg text-center text-sm hover:border-patient-500 transition-300">上午</button>
+            <button class="time-btn py-2 border border-neutral-200 rounded-lg text-center text-sm hover:border-patient-500 transition-300">下午</button>
+            <button class="time-btn py-2 border border-neutral-200 rounded-lg text-center text-sm hover:border-patient-500 transition-300">晚上</button>
+          </div>
+        </div>
+        
+        <!-- AI预问诊病历选择区域 -->
+        <div class="mb-6">
+          <label class="block text-sm font-medium text-neutral-700 mb-2">选择AI预问诊病历（可选）</label>
+          <div class="space-y-2 max-h-48 overflow-y-auto pr-1 scrollbar-hide" id="medical-records-container">
+            <!-- 病历卡片将通过JavaScript动态生成 -->
+          </div>
+          <p class="text-xs text-neutral-500 mt-2">最多选择一个病历，不选择将直接预约</p>
+        </div>
+        
+        <button id="confirm-appointment" class="w-full py-3 bg-patient-500 text-white font-medium rounded-lg hover:bg-patient-600 transition-300 flex items-center justify-center">
+          <i class="fa fa-calendar-check-o mr-2"></i> 确认预约
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 预约成功提示 (默认隐藏) -->
+  <div id="success-toast" class="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-success text-white px-6 py-3 rounded-lg shadow-lg flex items-center z-50 hidden">
+    <i class="fa fa-check-circle mr-2"></i>
+    <span>预约请求已发送</span>
+  </div>
+
+  <!-- 预约失败提示 (默认隐藏) -->
+  <div id="error-toast" class="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-danger text-white px-6 py-3 rounded-lg shadow-lg flex items-center z-50 hidden">
+    <i class="fa fa-exclamation-circle mr-2"></i>
+    <span id="error-message">预约失败，请选择医生可预约的日期</span>
+  </div>
+
+  <!-- 底部导航 -->
+  <footer class="bg-white border-t border-neutral-200 py-6">
+    <div class="container mx-auto px-4 text-center text-neutral-500 text-sm">
+      <p>© 2024 医智通 版权所有 | 数据传输加密 隐私合规</p>
+      <div class="flex justify-center space-x-4 mt-3">
+        <a href="#" class="hover:text-patient-500 transition-300">隐私政策</a>
+        <a href="#" class="hover:text-patient-500 transition-300">用户协议</a>
+        <a href="#" class="hover:text-patient-500 transition-300">客服中心</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- 引入外部API服务 -->
+  <script src="js/services/apiService.js"></script>
+  
+  <!-- 前端交互脚本 -->
+  <script>
+    // 全局变量
+    let currentDepartment = 'all'; // 当前选中的科室ID
+    let selectedDoctorId = null; // 当前选中的医生ID
+    let currentDoctorAvailableDays = []; // 当前医生可预约的日期
+    let dateDisplayMap = {}; // 日期标识符与显示文本的映射
+    let departmentsData = []; // 科室数据缓存
+
+    // 页面加载完成后初始化
+    document.addEventListener('DOMContentLoaded', async function() {
+      try {
+        // 显示加载状态
+        document.getElementById('loading-doctors').classList.remove('hidden');
+        document.getElementById('doctors-container').innerHTML = '';
+        
+        // 初始化日期显示
+        initDateDisplay();
+        
+        // 加载科室列表
+        departmentsData = await apiService.getDepartments();
+        initDepartmentDropdown(departmentsData);
+        
+        // 加载全部医生
+        const doctorsData = await apiService.getDoctors();
+        renderDoctors(doctorsData);
+
+        // 绑定关闭弹窗事件
+        document.getElementById('close-modal').addEventListener('click', closeModal);
+
+        // 点击弹窗外部关闭弹窗
+        document.getElementById('appointment-modal').addEventListener('click', function(e) {
+          if (e.target === this) {
+            closeModal();
+          }
+        });
+
+        // 绑定日期选择事件
+        document.querySelectorAll('.date-btn').forEach(btn => {
+          btn.addEventListener('click', function() {
+            document.querySelectorAll('.date-btn').forEach(b => {
+              b.classList.remove('border-patient-500', 'bg-patient-50', 'text-patient-700');
+            });
+            this.classList.add('border-patient-500', 'bg-patient-50', 'text-patient-700');
+          });
+        });
+
+        // 绑定时间段选择事件
+        document.querySelectorAll('.time-btn').forEach(btn => {
+          btn.addEventListener('click', function() {
+            document.querySelectorAll('.time-btn').forEach(b => {
+              b.classList.remove('border-patient-500', 'bg-patient-50', 'text-patient-700');
+            });
+            this.classList.add('border-patient-500', 'bg-patient-50', 'text-patient-700');
+          });
+        });
+
+        // 绑定确认预约事件
+        document.getElementById('confirm-appointment').addEventListener('click', confirmAppointment);
+
+        // 点击页面其他区域关闭下拉菜单
+        document.addEventListener('click', function(e) {
+          const dropdownBtn = document.getElementById('department-dropdown-btn');
+          const dropdown = document.getElementById('department-dropdown');
+          
+          if (!dropdownBtn.contains(e.target) && !dropdown.contains(e.target)) {
+            dropdown.classList.add('hidden');
+          }
+        });
+
+      } catch (error) {
+        console.error('初始化失败:', error.message);
+        showErrorToast('数据加载失败，请重试');
+        // 显示空状态
+        document.getElementById('loading-doctors').classList.add('hidden');
+        document.getElementById('empty-doctors').classList.remove('hidden');
+      }
+    });
+
+    // 初始化科室下拉菜单
+    function initDepartmentDropdown(departments) {
+      const dropdownContainer = document.querySelector('#department-dropdown .grid');
+      const dropdownBtn = document.getElementById('department-dropdown-btn');
+      
+      // 清空容器
+      dropdownContainer.innerHTML = '';
+      
+      // 生成科室选项
+      departments.forEach(dept => {
+        const deptItem = document.createElement('div');
+        deptItem.className = `dropdown-item ${dept.id === currentDepartment ? 'active' : ''}`;
+        deptItem.textContent = dept.name;
+        deptItem.setAttribute('data-department', dept.id);
+        
+        // 绑定点击事件
+        deptItem.addEventListener('click', function() {
+          const departmentId = this.getAttribute('data-department');
+          switchDepartment(departmentId);
+          // 更新按钮文本
+          const deptName = departments.find(d => d.id === departmentId).name;
+          document.querySelector('#department-dropdown-btn span').textContent = deptName;
+          // 关闭下拉菜单
+          document.getElementById('department-dropdown').classList.add('hidden');
+        });
+        
+        dropdownContainer.appendChild(deptItem);
+      });
+      
+      // 绑定下拉按钮点击事件
+      dropdownBtn.addEventListener('click', function() {
+        document.getElementById('department-dropdown').classList.toggle('hidden');
+      });
+    }
+
+    // 切换科室
+    function switchDepartment(departmentId) {
+      try {
+        // 显示加载状态
+        document.getElementById('loading-doctors').classList.remove('hidden');
+        document.getElementById('doctors-container').innerHTML = '';
+        document.getElementById('empty-doctors').classList.add('hidden');
+        
+        // 更新当前科室
+        currentDepartment = departmentId;
+        
+        // 更新下拉菜单选中状态
+        document.querySelectorAll('.dropdown-item').forEach(item => {
+          if (item.getAttribute('data-department') === departmentId) {
+            item.classList.add('active');
+          } else {
+            item.classList.remove('active');
+          }
+        });
+        
+        // 更新医生列表标题
+        const deptName = departmentsData.find(d => d.id === departmentId)?.name || '全部医生';
+        document.getElementById('doctor-list-title').textContent = `${deptName}医生`;
+        
+        // 调用API获取对应科室的医生
+        apiService.getDoctors(departmentId)
+          .then(doctorsData => renderDoctors(doctorsData))
+          .catch(error => {
+            console.error('切换科室失败:', error.message);
+            showErrorToast('获取医生失败，请重试');
+            document.getElementById('loading-doctors').classList.add('hidden');
+            document.getElementById('empty-doctors').classList.remove('hidden');
+          });
+      } catch (error) {
+        console.error('切换科室异常:', error.message);
+        showErrorToast('操作失败，请重试');
+      }
+    }
+
+    // 初始化日期显示（今天、明天、后天的月日格式）
+    function initDateDisplay() {
+      const today = new Date();
+      const tomorrow = new Date(today);
+      tomorrow.setDate(today.getDate() + 1);
+      const dayAfterTomorrow = new Date(today);
+      dayAfterTomorrow.setDate(today.getDate() + 2);
+      
+      // 格式化日期为"月日"格式
+      const formatDate = (date) => `${date.getMonth() + 1}月${date.getDate()}日`;
+      
+      const todayStr = formatDate(today);
+      const tomorrowStr = formatDate(tomorrow);
+      const dayAfterTomorrowStr = formatDate(dayAfterTomorrow);
+      
+      // 建立日期标识符与显示文本的映射
+      dateDisplayMap = {
+        today: {
+          display: todayStr,
+          full: `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+        },
+        tomorrow: {
+          display: tomorrowStr,
+          full: `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`
+        },
+        dayAfterTomorrow: {
+          display: dayAfterTomorrowStr,
+          full: `${dayAfterTomorrow.getFullYear()}-${String(dayAfterTomorrow.getMonth() + 1).padStart(2, '0')}-${String(dayAfterTomorrow.getDate()).padStart(2, '0')}`
+        }
+      };
+      
+      // 更新日期按钮显示
+      const dateBtns = document.querySelectorAll('.date-btn');
+      dateBtns[0].textContent = todayStr;
+      dateBtns[1].textContent = tomorrowStr;
+      dateBtns[2].textContent = dayAfterTomorrowStr;
+    }
+
+    // 渲染医生列表
+    function renderDoctors(doctorList) {
+      const container = document.getElementById('doctors-container');
+      const loading = document.getElementById('loading-doctors');
+      const empty = document.getElementById('empty-doctors');
+      
+      // 隐藏加载状态
+      loading.classList.add('hidden');
+      
+      if (!doctorList || doctorList.length === 0) {
+        // 显示空状态
+        empty.classList.remove('hidden');
+        container.innerHTML = '';
+        return;
+      }
+      
+      // 隐藏空状态
+      empty.classList.add('hidden');
+      
+      // 清空容器
+      container.innerHTML = '';
+      
+      // 渲染医生卡片
+      doctorList.forEach(doctor => {
+        const card = createDoctorCard(doctor);
+        container.appendChild(card);
+      });
+    }
+
+    // 创建医生卡片
+    function createDoctorCard(doctor) {
+      const card = document.createElement('div');
+      card.className = 'bg-white rounded-xl shadow overflow-hidden hover:shadow-lg transition-300';
+      
+      // 医生头像（使用姓名首字母或图片）
+      const initial = doctor.name.charAt(0);
+      const avatarHtml = doctor.avatar 
+        ? `<img src="${doctor.avatar}" alt="${doctor.name}" class="w-14 h-14 rounded-full object-cover mr-4 flex-shrink-0">`
+        : `<div class="w-14 h-14 rounded-full bg-doctor-100 flex items-center justify-center mr-4 flex-shrink-0">
+             <span class="text-doctor-700 font-bold text-xl">${initial}</span>
+           </div>`;
+      
+      // 专长标签HTML
+      const specialtyTags = doctor.specialty?.map(s => 
+        `<span class="badge-pill bg-neutral-100 text-neutral-700 mr-1 mb-1">${s}</span>`
+      ).join('') || '';
+      
+      // 可用状态HTML
+      const availabilityHtml = doctor.available 
+        ? `<span class="badge-pill bg-success/10 text-success"><i class="fa fa-check-circle mr-1"></i>可预约</span>`
+        : `<span class="badge-pill bg-neutral-100 text-neutral-500"><i class="fa fa-times-circle mr-1"></i>暂不可约</span>`;
+      
+      // 转换可预约日期为显示格式
+      const availableDatesText = doctor.available && doctor.availableDays?.length > 0
+        ? doctor.availableDays.map(day => {
+            // 尝试匹配日期映射表中的显示文本
+            const matchedDate = Object.values(dateDisplayMap).find(d => d.full === day);
+            return matchedDate ? matchedDate.display : day.replace(/-/g, '月') + '日';
+          }).join('、')
+        : '';
+      
+      // 可预约日期HTML
+      const availableDaysHtml = doctor.available && doctor.availableDays?.length > 0
+        ? `<div class="mt-2">
+             <span class="text-xs text-neutral-500">可预约日期：</span>
+             <span class="text-xs text-neutral-700">${availableDatesText}</span>
+           </div>`
+        : '';
+      
+      card.innerHTML = `
+        <div class="p-5">
+          <div class="flex justify-between items-start">
+            <div class="flex items-start">
+              ${avatarHtml}
+              <div>
+                <div class="flex items-center">
+                  <h3 class="font-bold text-neutral-800 text-lg">${doctor.name}</h3>
+                  <span class="ml-2 text-sm text-neutral-500">${doctor.title}</span>
+                </div>
+                <p class="text-neutral-600 text-sm mt-1">${doctor.departmentName}</p>
+              </div>
+            </div>
+            ${availabilityHtml}
+          </div>
+          
+          <div class="mt-3 flex flex-wrap">
+            ${specialtyTags}
+          </div>
+          
+          <p class="text-neutral-600 text-sm mt-3 line-clamp-2">${doctor.introduction || '暂无医生简介'}</p>
+          
+          ${availableDaysHtml}
+          
+          <div class="mt-4 pt-4 border-t border-neutral-100 flex justify-between items-center">
+            <span class="text-neutral-500 text-sm"><i class="fa fa-hospital-o mr-1"></i>执业${doctor.experience || 0}年</span>
+            <button class="appointment-btn px-4 py-2 bg-patient-500 text-white rounded-lg text-sm font-medium hover:bg-patient-600 transition-300 ${!doctor.available ? 'opacity-50 cursor-not-allowed' : ''}" 
+                    data-doctor-id="${doctor.id}" 
+                    ${!doctor.available ? 'disabled' : ''}>
+              立即预约
+            </button>
+          </div>
+        </div>
+      `;
+      
+      // 绑定预约按钮事件
+      const appointmentBtn = card.querySelector('.appointment-btn');
+      if (doctor.available) {
+        appointmentBtn.addEventListener('click', function() {
+          // 优化后：直接使用创建卡片时的doctor对象
+          openAppointmentModal(doctor.id, doctor);
+        });
+      }
+      return card;
+    }
+
+    // 渲染AI预问诊病历卡片
+    async function renderMedicalRecords() {
+      try {
+        const container = document.getElementById('medical-records-container');
+        container.innerHTML = '<div class="py-4 text-center"><i class="fa fa-circle-o-notch fa-spin text-patient-500"></i> 加载病历中...</div>';
+        
+        // 从API获取病历数据
+        const records = await apiService.getMedicalRecords();
+        
+        if (!records || records.length === 0) {
+          container.innerHTML = `
+            <div class="p-3 bg-neutral-50 rounded-lg text-center text-neutral-500 text-sm">
+              暂无AI预问诊病历
+            </div>
+          `;
+          return;
+        }
+        
+        // 清空容器
+        container.innerHTML = '';
+        
+        // 为每条记录添加selected属性
+        const recordsWithSelection = records.map(record => ({ ...record, selected: false }));
+        
+        recordsWithSelection.forEach(record => {
+          const card = document.createElement('div');
+          card.className = `border ${record.selected ? 'border-patient-500 bg-patient-50' : 'border-neutral-200'} rounded-lg p-3 hover:border-patient-300 transition-300 cursor-pointer`;
+          
+          // 格式化日期显示（仅保留年月日）
+          const formattedDate = record.createdAt 
+            ? new Date(record.createdAt).toLocaleDateString() 
+            : '未知时间';
+
+          card.innerHTML = `
+            <div class="flex justify-between items-start mb-2">
+              <!-- 显示AI诊断结果（对应“诊断”字段） -->
+              <h4 class="font-medium text-neutral-800">${record.诊断 || '未诊断'}</h4>
+              <!-- 显示创建时间（createdAt字段） -->
+              <span class="text-xs text-neutral-500">${formattedDate}</span>
+            </div>
+            <!-- 显示主诉（对应“主诉”字段） -->
+            <p class="text-sm text-neutral-600 mb-1">
+              <span class="text-neutral-500">主诉：</span>${record.主诉 || '无描述'}
+            </p>
+            <div class="mt-2 flex justify-end">
+              <div class="w-4 h-4 rounded-full border-2 ${record.selected ? 'border-patient-500 bg-patient-500' : 'border-neutral-300'} flex items-center justify-center record-checkbox">
+                ${record.selected ? '<i class="fa fa-check text-white text-xs"></i>' : ''}
+              </div>
+            </div>
+          `;
+          
+          card.addEventListener('click', () => {
+            // 单选逻辑
+            recordsWithSelection.forEach(r => r.selected = r.id === record.id);
+            renderMedicalRecords();
+          });
+          
+          container.appendChild(card);
+        });
+      } catch (error) {
+        console.error('渲染病历失败:', error.message);
+        document.getElementById('medical-records-container').innerHTML = `
+          <div class="p-3 bg-neutral-50 rounded-lg text-center text-danger text-sm">
+            加载病历失败，请重试
+          </div>
+        `;
+      }
+    }
+
+    // 打开预约弹窗
+    function openAppointmentModal(doctorId, doctor) {
+      if (!doctor) return;
+      
+      // 保存选中的医生ID和可预约日期
+      selectedDoctorId = doctorId;
+      currentDoctorAvailableDays = doctor.availableDays || [];
+      
+      // 更新弹窗内容
+      document.getElementById('modal-doctor-name').textContent = `${doctor.name} ${doctor.title}`;
+      document.getElementById('modal-doctor-department').textContent = doctor.departmentName || '';
+      document.getElementById('modal-doctor-icon').textContent = doctor.name.charAt(0);
+      
+      // 渲染病历列表
+      renderMedicalRecords();
+      
+      // 显示弹窗
+      const modal = document.getElementById('appointment-modal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      
+      // 阻止页面滚动
+      document.body.style.overflow = 'hidden';
+    }
+
+    // 关闭预约弹窗
+    function closeModal() {
+      const modal = document.getElementById('appointment-modal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+      
+      // 恢复页面滚动
+      document.body.style.overflow = '';
+    }
+
+    // 确认预约
+    async function confirmAppointment() {
+      try {
+        // 简单验证
+        const selectedDateBtn = document.querySelector('.date-btn.border-patient-500');
+        const selectedTimeBtn = document.querySelector('.time-btn.border-patient-500');
+        
+        if (!selectedDateBtn || !selectedTimeBtn) {
+          showErrorToast('请选择预约日期和时段');
+          return;
+        }
+        
+        // 获取选中的日期文本和对应的完整日期
+        const selectedDateText = selectedDateBtn.textContent;
+        const selectedDateInfo = Object.values(dateDisplayMap).find(d => d.display === selectedDateText);
+        
+        if (!selectedDateInfo) {
+          showErrorToast('无效的日期选择');
+          return;
+        }
+        
+        // 验证日期是否在医生可预约范围内
+        if (!currentDoctorAvailableDays.includes(selectedDateInfo.full)) {
+          showErrorToast('所选日期不可预约，请选择医生可预约的日期');
+          return;
+        }
+        
+        // 获取选中的病历ID（通过卡片状态判断）
+        let selectedRecordId = null;
+        const selectedRecordCard = document.querySelector('#medical-records-container .border-patient-500');
+        if (selectedRecordCard) {
+          // 从卡片内容解析ID（实际项目中建议通过data属性存储）
+          const diagnosis = selectedRecordCard.querySelector('h4').textContent;
+          const records = await apiService.getAllMedicalRecords();
+          const matchedRecord = records.find(r => r.diagnosis === diagnosis);
+          selectedRecordId = matchedRecord?.id || null;
+        }
+        
+        // 调用API提交预约
+        const appointment = {
+          doctorId: selectedDoctorId,
+          appointmentDate: selectedDateInfo.full, // 提交完整日期格式
+          appointmentTime: selectedTimeBtn.textContent,
+          medicalRecordId: selectedRecordId
+        };
+        
+        await apiService.createAppointment(appointment);
+        
+        // 预约成功处理
+        closeModal();
+        showSuccessToast();
+        
+        // 清空选择状态
+        document.querySelectorAll('.date-btn, .time-btn').forEach(btn => {
+          btn.classList.remove('border-patient-500', 'bg-patient-50', 'text-patient-700');
+        });
+        
+      } catch (error) {
+        console.error('预约失败:', error.message);
+        showErrorToast(error.message || '预约失败，请重试');
+      }
+    }
+
+    // 显示成功提示
+    function showSuccessToast() {
+      const successToast = document.getElementById('success-toast');
+      const errorToast = document.getElementById('error-toast');
+      
+      errorToast.classList.add('hidden');
+      successToast.classList.remove('hidden');
+      
+      // 3秒后隐藏提示
+      setTimeout(() => {
+        successToast.classList.add('hidden');
+      }, 3000);
+    }
+
+    // 显示错误提示
+    function showErrorToast(message) {
+      const errorToast = document.getElementById('error-toast');
+      const successToast = document.getElementById('success-toast');
+      
+      successToast.classList.add('hidden');
+      document.getElementById('error-message').textContent = message;
+      errorToast.classList.remove('hidden');
+      
+      // 3秒后隐藏提示
+      setTimeout(() => {
+        errorToast.classList.add('hidden');
+      }, 3000);
+    }
+  </script>
+</body>
+</html>

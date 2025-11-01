@@ -294,40 +294,39 @@ const apiService = {
     }
   },
 
-  /**
+    /**
    * 通知后端开启新的对话
    * 后端接口：POST /api/chat/new
    * @returns {Promise<Object>} 后端返回的确认信息
    */
-  startNewMedicalChat: async function() {
-    try {
-      const response = await fetch(`${API_BASE_URL}/chat/new`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        credentials: 'include'
-      });
-
-      if (response.status === 401) {
-        localStorage.removeItem('access_token');
-        throw new Error('登录已过期，请重新登录');
+    startNewMedicalChat: async function() {
+      try {
+        const response = await fetch(`${API_BASE_URL}/chat/new`, {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          credentials: 'include'
+        });
+  
+        if (response.status === 401) {
+          localStorage.removeItem('access_token');
+          throw new Error('登录已过期，请重新登录');
+        }
+        if (response.status === 500) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || '服务器内部错误');
+        }
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(`开启新对话失败: ${errorData.message || response.statusText}`);
+        }
+  
+        return await response.json();
+      } catch (error) {
+        console.error('startNewMedicalChat 调用失败:', error.message);
+        throw error;
       }
-      if (response.status === 500) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || '服务器内部错误');
-      }
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(`开启新对话失败: ${errorData.message || response.statusText}`);
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error('startNewMedicalChat 调用失败:', error.message);
-      throw error;
-    }
-  },
-
-  /**
+    },
+    /**
    * 生成病历并保存
    * 后端接口：POST /api/chat/medical/record
    * @returns {Promise<Object>} AI生成的病历对象
@@ -361,208 +360,6 @@ const apiService = {
       console.error('generateMedicalRecord 调用失败:', error.message);
       throw error;
     }
-  },
-
-  /**
-   * 获取所有科室列表
-   * 后端接口：GET /api/departments
-   */
-  getDepartments: async function() {
-    try {
-      const response = await fetch(`${API_BASE_URL}/departments`, {
-        method: 'GET',
-        headers: getAuthHeaders(),
-        credentials: 'include'
-      });
-
-      if (response.status === 401) {
-        localStorage.removeItem('access_token');
-        throw new Error('登录已过期，请重新登录');
-      }
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(`获取科室失败: ${errorData.message || response.statusText}`);
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error('getDepartments 调用失败:', error.message);
-      throw error;
-    }
-  },
-
-  /**
-   * 获取医生列表（支持按科室筛选）
-   * 后端接口：GET /api/doctors?departmentId=xxx
-   * @param {string|null} departmentId 科室ID（为空时获取全部医生）
-   */
-  getDoctors: async function(departmentId = null) {
-    try {
-      // 构建带筛选参数的URL
-      let url = `${API_BASE_URL}/doctors`;
-      if (departmentId) {
-        url += `?departmentId=${encodeURIComponent(departmentId)}`;
-      }
-
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: getAuthHeaders(),
-        credentials: 'include'
-      });
-
-      if (response.status === 401) {
-        localStorage.removeItem('access_token');
-        throw new Error('登录已过期，请重新登录');
-      }
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(`获取医生列表失败: ${errorData.message || response.statusText}`);
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error('getDoctors 调用失败:', error.message);
-      throw error;
-    }
-  },
-
-  /**
-   * 提交医生预约请求
-   * 后端接口：POST /api/appointments
-   * @param {Object} appointment 预约信息
-   */
-  createAppointment: async function(appointment) {
-    try {
-      const response = await fetch(`${API_BASE_URL}/appointments`, {
-        method: 'POST',
-        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify(appointment),
-        credentials: 'include'
-      });
-
-      if (response.status === 401) {
-        localStorage.removeItem('access_token');
-        throw new Error('登录已过期，请重新登录');
-      }
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(`预约失败: ${errorData.message || response.statusText}`);
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error('createAppointment 调用失败:', error.message);
-      throw error;
-    }
-  },
-
-  /**
-   * 获取病历记录列表（独立于问诊记录的病历数据）
-   * 对应后端接口：GET /api/medical-records
-   * @returns {Promise<Array>} 病历记录数组，包含主诉、诊断等完整病历信息
-   */
-  getMedicalRecords: async function() {
-    try {
-      const response = await fetch(`${API_BASE_URL}/medical-records`, {
-        method: 'GET',
-        headers: getAuthHeaders(),
-        credentials: 'include'
-      });
-
-      // 处理401未授权错误（token失效/未登录）
-      if (response.status === 401) {
-        localStorage.removeItem('access_token');
-        throw new Error('登录已过期，请重新登录');
-      }
-
-      // 处理服务器内部错误
-      if (response.status === 500) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || '服务器内部错误，获取病历记录失败');
-      }
-
-      // 处理其他错误状态码
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(`获取病历记录失败: ${errorData.message || response.statusText}`);
-      }
-
-      // 解析响应数据（病历记录数组）
-      const medicalRecords = await response.json();
-
-      // 验证返回数据格式（必须是数组）
-      if (!Array.isArray(medicalRecords)) {
-        throw new Error('后端返回病历记录格式错误：预期为数组');
-      }
-
-      return medicalRecords;
-
-    } catch (error) {
-      console.error('getMedicalRecords API调用失败:', error.message);
-      throw error; // 抛出错误供上层处理
-    }
-  },
-
-
-    /**
-     * 获取病历详情
-     * 对应后端接口：GET /api/medical-records/:id
-     * @param {number|string} recordId 病历ID
-     * @returns {Promise<Object>} 病历详情对象（包含主诉、现病史等字段）
-     */
-  getMedicalRecordDetail: async function(recordId) {
-    try {
-      // 验证参数有效性
-      if (!recordId || (typeof recordId !== 'number' && typeof recordId !== 'string')) {
-        throw new Error('无效的病历ID');
-      }
-
-      // 发起请求获取指定ID的病历详情
-      const response = await fetch(`${API_BASE_URL}/medical-records/${recordId}`, {
-        method: 'GET',
-        headers: getAuthHeaders(),
-        credentials: 'include'
-      });
-
-      // 处理401未授权错误
-      if (response.status === 401) {
-        localStorage.removeItem('access_token');
-        throw new Error('登录已过期，请重新登录');
-      }
-
-      // 处理404未找到错误
-      if (response.status === 404) {
-        throw new Error('未找到该病历记录');
-      }
-
-      // 处理服务器内部错误
-      if (response.status === 500) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || '服务器内部错误');
-      }
-
-      // 处理其他错误状态
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(`获取病历详情失败: ${errorData.message || response.statusText}`);
-      }
-
-      // 解析并返回病历详情数据
-      const recordDetail = await response.json();
-      
-      // 验证返回数据格式
-      if (typeof recordDetail !== 'object' || recordDetail === null) {
-        throw new Error('后端返回病历详情格式错误');
-      }
-
-      return recordDetail;
-
-    } catch (error) {
-      console.error('getMedicalRecordDetail API调用失败:', error.message);
-      throw error; // 抛出错误供页面处理
-    }
   }
+  // 其他需要认证的API方法...
 };

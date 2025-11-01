@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>医智通 - 我的病历</title>
+  <!-- 基础样式与脚本 -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+
+  <!-- Tailwind配置 -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            patient: { // 病人端主色：淡蓝色
+              50: '#f0f7ff', 100: '#e0efff', 200: '#b9ddff', 
+              300: '#7cc3fc', 400: '#3d9fe8', 500: '#0a84e3', 
+              600: '#0066c7', 700: '#0052a3', 800: '#004382'
+            },
+            doctor: { // 医护端主色：淡青色
+              50: '#f0fdfa', 100: '#ccfbf1', 200: '#99f6e4', 
+              300: '#5eead4', 400: '#2dd4bf', 500: '#14b8a6', 
+              600: '#0d9488', 700: '#0f766e', 800: '#115e59'
+            },
+            success: '#10b981', warning: '#f59e0b', danger: '#ef4444'
+          },
+          fontFamily: {
+            sans: ['Microsoft YaHei', 'Source Han Sans CN', 'sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+
+  <style type="text/tailwindcss">
+    @layer utilities {
+      .content-auto { content-visibility: auto; }
+      .transition-300 { transition: all 300ms ease; }
+      .scrollbar-hide::-webkit-scrollbar { display: none; }
+      .backdrop-blur { backdrop-filter: blur(8px); }
+      .clickable-card { cursor: pointer; }
+      .ai-initial { @apply font-bold text-sm; }
+      .skeleton { @apply bg-neutral-200 animate-pulse rounded; }
+      .badge-pill { @apply inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-medium; }
+      .record-checkbox { @apply transition-300; }
+      .dropdown-item { @apply px-3 py-2 rounded-lg text-sm hover:bg-patient-50 transition-300 cursor-pointer; }
+      .dropdown-item.active { @apply bg-patient-100 text-patient-700 font-medium; }
+    }
+  </style>
+</head>
+<body class="bg-neutral-50 min-h-screen flex flex-col">
+  <!-- 顶部导航栏 -->
+  <header class="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur shadow-sm transition-300">
+    <div class="container mx-auto px-4 py-3 flex items-center justify-between">
+      <!-- 返回按钮和标题 -->
+      <div class="flex items-center space-x-3">
+        <button class="text-neutral-700 hover:text-patient-500 transition-300" onclick="history.back()">
+          <i class="fa fa-arrow-left text-xl"></i>
+        </button>
+        <h1 class="text-xl font-bold text-neutral-800">我的病历</h1>
+      </div>
+    </div>
+  </header>
+
+  <!-- 主内容区 -->
+  <main class="flex-1 pt-16">
+    <div class="container mx-auto px-4 py-6">
+      <!-- 病历列表 -->
+      <div class="mb-8">
+
+
+        <!-- 病历列表 -->
+        <div class="space-y-4" id="medical-records-container">
+          <!-- 病历卡片将通过JavaScript动态生成 -->
+        </div>
+
+        <!-- 加载状态 -->
+        <div id="loading-records" class="py-12 text-center">
+          <i class="fa fa-circle-o-notch fa-spin text-patient-500 text-2xl mb-3"></i>
+          <p class="text-neutral-500">加载病历信息中...</p>
+        </div>
+
+        <!-- 空状态 (默认隐藏) -->
+        <div id="empty-records" class="hidden py-12 text-center">
+          <div class="w-16 h-16 mx-auto bg-neutral-100 rounded-full flex items-center justify-center mb-3">
+            <i class="fa fa-file-text-o text-neutral-400 text-2xl"></i>
+          </div>
+          <p class="text-neutral-500">暂无AI预问诊病历</p>
+          <button id="create-first-record" class="mt-4 px-4 py-2 bg-patient-500 text-white rounded-lg text-sm font-medium hover:bg-patient-600 transition-300">
+            开始第一次AI预问诊
+          </button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- 底部导航 -->
+  <footer class="bg-white border-t border-neutral-200 py-6">
+    <div class="container mx-auto px-4 text-center text-neutral-500 text-sm">
+      <p>© 2024 医智通 版权所有 | 数据传输加密 隐私合规</p>
+      <div class="flex justify-center space-x-4 mt-3">
+        <a href="#" class="hover:text-patient-500 transition-300">隐私政策</a>
+        <a href="#" class="hover:text-patient-500 transition-300">用户协议</a>
+        <a href="#" class="hover:text-patient-500 transition-300">客服中心</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- 引入外部API服务 -->
+  <script src="js/services/apiService.js"></script>
+  
+  <!-- 前端交互脚本 -->
+  <script>
+
+    // 页面加载完成后初始化
+    document.addEventListener('DOMContentLoaded', async function() {
+      try {
+        // 显示加载状态
+        document.getElementById('loading-records').classList.remove('hidden');
+        document.getElementById('medical-records-container').innerHTML = '';
+        
+        // 加载病历列表
+        renderMedicalRecords();
+
+
+
+        // 绑定创建第一条病历按钮事件
+        document.getElementById('create-first-record').addEventListener('click', function() {
+          alert('跳转到AI预问诊页面');
+          // 实际应用中应该跳转到AI预问诊页面
+          // window.location.href = 'ai_consultation.html';
+        });
+
+      } catch (error) {
+        console.error('初始化失败:', error.message);
+        showErrorToast('数据加载失败，请重试');
+        // 显示空状态
+        document.getElementById('loading-records').classList.add('hidden');
+        document.getElementById('empty-records').classList.remove('hidden');
+      }
+    });
+
+    // 渲染病历列表
+    async function renderMedicalRecords() {
+      try {
+        const container = document.getElementById('medical-records-container');
+        const loading = document.getElementById('loading-records');
+        const empty = document.getElementById('empty-records');
+        
+        // 显示加载状态
+        loading.classList.remove('hidden');
+        container.innerHTML = '';
+        
+        // 从API获取病历数据
+        const records = await apiService.getMedicalRecords();
+        
+        // 隐藏加载状态
+        loading.classList.add('hidden');
+        
+        if (!records || records.length === 0) {
+          // 显示空状态
+          empty.classList.remove('hidden');
+          return;
+        }
+        
+        // 隐藏空状态
+        empty.classList.add('hidden');
+        
+        // 清空容器
+        container.innerHTML = '';
+        
+        // 渲染病历卡片
+        records.forEach(record => {
+          const card = createMedicalRecordCard(record);
+          container.appendChild(card);
+        });
+        
+      } catch (error) {
+        console.error('渲染病历失败:', error.message);
+        document.getElementById('medical-records-container').innerHTML = `
+          <div class="p-6 bg-neutral-50 rounded-lg text-center text-danger text-sm">
+            <i class="fa fa-exclamation-circle mr-1"></i> 加载病历失败，请重试
+          </div>
+        `;
+      }
+    }
+
+    // 创建病历卡片
+    function createMedicalRecordCard(record) {
+      const card = document.createElement('div');
+      card.className = 'bg-white rounded-xl shadow overflow-hidden hover:shadow-lg transition-300 border border-neutral-100';
+      
+      // 格式化日期显示（仅保留年月日）
+      const formattedDate = record.createdAt 
+        ? new Date(record.createdAt).toLocaleDateString() 
+        : '未知时间';
+
+      // 处理诊断结果
+      const diagnosisText = record.诊断 || '未完成诊断';
+      const diagnosisClass = record.诊断 ? 'text-neutral-800' : 'text-neutral-500';
+      
+      card.innerHTML = `
+        <div class="p-5">
+          <div class="flex justify-between items-start mb-3">
+            <h3 class="font-medium ${diagnosisClass} text-lg">${diagnosisText}</h3>
+          </div>
+          
+          <div class="space-y-2">
+            <p class="text-sm">
+              <span class="text-neutral-500">主诉：</span>
+              <span class="text-neutral-700">${record.主诉 || '无描述'}</span>
+            </p>
+          </div>
+          
+          <div class="mt-4 pt-4 border-t border-neutral-100 flex justify-between items-center">
+            <span class="text-xs text-neutral-500">
+              <i class="fa fa-calendar-o mr-1"></i>
+              ${formattedDate}
+              <span class="mx-1">|</span>
+              <i class="fa fa-clock-o ml-1"></i>
+              ${new Date(record.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+            </span>
+            <button class="view-record-btn px-3 py-1.5 bg-patient-500 text-white rounded-lg text-sm font-medium hover:bg-patient-600 transition-300" 
+                    data-record-id="${record.id}">
+              查看详情
+            </button>
+          </div>
+        </div>
+      `;
+      
+      // 绑定查看详情按钮事件
+      const viewBtn = card.querySelector('.view-record-btn');
+      viewBtn.addEventListener('click', function() {
+        const recordId = parseInt(this.getAttribute('data-record-id'));
+        window.location.href = `patient_MedicalRecord.html?id=${recordId}`;
+      });
+      
+      return card;
+    }
+
+    // 显示错误提示
+    function showErrorToast(message) {
+      // 创建临时提示元素
+      const toast = document.createElement('div');
+      toast.className = 'fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-danger text-white px-6 py-3 rounded-lg shadow-lg flex items-center z-50';
+      toast.innerHTML = `
+        <i class="fa fa-exclamation-circle mr-2"></i>
+        <span>${message}</span>
+      `;
+      
+      document.body.appendChild(toast);
+      
+      // 3秒后移除提示
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'transition-opacity');
+        setTimeout(() => {
+          document.body.removeChild(toast);
+        }, 300);
+      }, 3000);
+    }
+  </script>
+</body>
+</html>

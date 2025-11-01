@@ -34,6 +34,10 @@ def create_app(config_name='default'):
     app.register_blueprint(chat_bp)
     from .api.department_api import department_bp
     app.register_blueprint(department_bp)
+    from .api.appointment_api import appointment_bp
+    app.register_blueprint(appointment_bp)
+    from .api.doctor_api import doctor_bp
+    app.register_blueprint(doctor_bp)
 
     # 4. 导入数据库模型，以便 Flask-Migrate 能够检测到它们
     # 这是让 `flask db migrate` 正常工作的关键一步
