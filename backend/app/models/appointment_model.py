@@ -9,6 +9,12 @@ class AppointmentModel(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     patient_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, comment='关联的病人ID')
     doctor_id = db.Column(db.Integer, db.ForeignKey('doctors.id'), nullable=False, comment='关联的医生ID')
+    medical_record_id = db.Column(
+        db.Integer, 
+        db.ForeignKey('medical_records.id'), 
+        nullable=True, 
+        comment='关联的AI病历ID'
+    )
     appointment_time = db.Column(db.DateTime, nullable=False, comment='预约的日期和时间')
     status = db.Column(db.String(20), default='scheduled', comment="状态 ('scheduled', 'completed', 'canceled')")
     is_urgent = db.Column(db.Boolean, default=False, comment='是否为加急')

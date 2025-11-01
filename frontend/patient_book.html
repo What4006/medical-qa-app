@@ -297,7 +297,7 @@
           const departmentId = this.getAttribute('data-department');
           switchDepartment(departmentId);
           // 更新按钮文本
-          const deptName = departments.find(d => d.id === departmentId).name;
+          const deptName = departments.find(d => d.id == departmentId).name;
           document.querySelector('#department-dropdown-btn span').textContent = deptName;
           // 关闭下拉菜单
           document.getElementById('department-dropdown').classList.add('hidden');
@@ -554,13 +554,9 @@
               </div>
             </div>
           `;
-          
-          card.addEventListener('click', () => {
-            // 单选逻辑
-            recordsWithSelection.forEach(r => r.selected = r.id === record.id);
-            renderMedicalRecords();
-          });
-          
+          //这里改了----
+          card.addEventListener('click', handleRecordSelection);
+          //-----------
           container.appendChild(card);
         });
       } catch (error) {
@@ -571,6 +567,36 @@
           </div>
         `;
       }
+    }
+
+    // 新增：--------------处理病历卡片的选中与取消选中
+    function handleRecordSelection(event) {
+        const container = document.getElementById('medical-records-container');
+        const clickedCard = event.currentTarget; // 获取被点击的卡片
+
+        // 1. 检查这张卡片是否已经被选中
+        const isAlreadySelected = clickedCard.classList.contains('border-patient-500');
+
+        // 2. 移除所有卡片上的选中样式
+        container.querySelectorAll('.border-patient-500').forEach(card => {
+            card.classList.remove('border-patient-500', 'bg-patient-50');
+            card.classList.add('border-neutral-200');
+            const checkbox = card.querySelector('.record-checkbox');
+            checkbox.classList.remove('border-patient-500', 'bg-patient-500');
+            checkbox.classList.add('border-neutral-300');
+            checkbox.innerHTML = '';
+        });
+
+        // 3. 如果点击的卡片原先未被选中，则添加选中样式
+        // (如果点击的是已选中的卡片，则上一步已经移除了它的样式，实现了“取消选择”)
+        if (!isAlreadySelected) {
+            clickedCard.classList.add('border-patient-500', 'bg-patient-50');
+            clickedCard.classList.remove('border-neutral-200');
+            const checkbox = clickedCard.querySelector('.record-checkbox');
+            checkbox.classList.add('border-patient-500', 'bg-patient-500');
+            checkbox.classList.remove('border-neutral-300');
+            checkbox.innerHTML = '<i class="fa fa-check text-white text-xs"></i>';
+        }
     }
 
     // 打开预约弹窗
@@ -638,13 +664,12 @@
         // 获取选中的病历ID（通过卡片状态判断）
         let selectedRecordId = null;
         const selectedRecordCard = document.querySelector('#medical-records-container .border-patient-500');
+        //修改部分----------------
         if (selectedRecordCard) {
-          // 从卡片内容解析ID（实际项目中建议通过data属性存储）
-          const diagnosis = selectedRecordCard.querySelector('h4').textContent;
-          const records = await apiService.getAllMedicalRecords();
-          const matchedRecord = records.find(r => r.diagnosis === diagnosis);
-          selectedRecordId = matchedRecord?.id || null;
+          // (***) 直接从 data-record-id 属性获取 ID
+          selectedRecordId = selectedRecordCard.getAttribute('data-record-id');
         }
+        //-----------------------
         
         // 调用API提交预约
         const appointment = {

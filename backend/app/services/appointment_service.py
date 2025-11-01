@@ -43,9 +43,8 @@ def create_appointment(data, patient_user_id):
             patient_id=patient.id,
             doctor_id=doctor.id,
             appointment_time=appointment_datetime,
-            status='scheduled', # (文档为 'pending' [cite: 1052])
-            # medicalRecordId 字段在 AppointmentModel 中不存在, 暂不处理
-            # [cite: 1036]
+            status='scheduled', 
+            medical_record_id=data.get('medicalRecordId')
         )
 
         db.session.add(new_appointment)

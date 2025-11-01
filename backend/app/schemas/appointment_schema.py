@@ -10,7 +10,7 @@ class AppointmentRequestSchema(ma.Schema):
     doctorId = fields.Int(required=True)
     appointmentDate = fields.Date(required=True, format="%Y-%m-%d")
     appointmentTime = fields.Str(required=True, validate=validate.Length(min=2)) # e.g., "上午"
-    medicalRecordId = fields.Int(required=False)
+    medicalRecordId = fields.Int(required=False, allow_none=True)
 
 class AppointmentResponseSchema(ma.Schema):
     """
