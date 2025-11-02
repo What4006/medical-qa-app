@@ -460,6 +460,54 @@ const apiService = {
   },
 
   /**
+   * 获取用户的待处理预约（等待确认状态）
+   * 对应后端接口：GET /api/appointments/pending
+   * @returns {Promise<Array>} 待处理预约数组
+   */
+  getPendingAppointments: async function() {
+    try {
+      const response = await fetch(`${API_BASE_URL}/appointments/pending`, {
+        method: 'GET',
+        headers: getAuthHeaders(),
+        credentials: 'include'
+      });
+
+      // 处理401未授权错误
+      if (response.status === 401) {
+        localStorage.removeItem('access_token');
+        throw new Error('登录已过期，请重新登录');
+      }
+
+      // 处理服务器内部错误
+      if (response.status === 500) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || '服务器内部错误，获取预约信息失败');
+      }
+
+      // 处理其他错误状态
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`获取待处理预约失败: ${errorData.message || response.statusText}`);
+      }
+
+      // 解析响应数据（预约数组）
+      const pendingAppointments = await response.json();
+
+      // 验证返回数据格式（必须是数组）
+      if (!Array.isArray(pendingAppointments)) {
+        throw new Error('后端返回预约数据格式错误：预期为数组');
+      }
+
+      return pendingAppointments;
+
+    } catch (error) {
+      console.error('getPendingAppointments API调用失败:', error.message);
+      throw error; // 抛出错误供上层处理
+    }
+  },
+
+
+  /**
    * 获取病历记录列表（独立于问诊记录的病历数据）
    * 对应后端接口：GET /api/medical-records
    * @returns {Promise<Array>} 病历记录数组，包含主诉、诊断等完整病历信息
@@ -507,12 +555,12 @@ const apiService = {
   },
 
 
-    /**
-     * 获取病历详情
-     * 对应后端接口：GET /api/medical-records/:id
-     * @param {number|string} recordId 病历ID
-     * @returns {Promise<Object>} 病历详情对象（包含主诉、现病史等字段）
-     */
+  /**
+   * 获取病历详情
+   * 对应后端接口：GET /api/medical-records/:id
+   * @param {number|string} recordId 病历ID
+   * @returns {Promise<Object>} 病历详情对象（包含主诉、现病史等字段）
+   */
   getMedicalRecordDetail: async function(recordId) {
     try {
       // 验证参数有效性
@@ -563,6 +611,170 @@ const apiService = {
     } catch (error) {
       console.error('getMedicalRecordDetail API调用失败:', error.message);
       throw error; // 抛出错误供页面处理
+    }
+  },
+
+  /**
+   * 获取用户详细信息（个人中心使用）
+   * 对应后端接口：GET /api/user/info
+   * @returns {Promise<Object>} 用户信息对象
+   */
+  getUserInfo: async function() {
+    try {
+      const response = await fetch(`${API_BASE_URL}/user/info`, {
+        method: 'GET',
+        headers: getAuthHeaders(),
+        credentials: 'include'
+      });
+
+      const data = await response.json();
+
+      if (response.status === 401) {
+        localStorage.removeItem('access_token');
+        throw new Error(data.message || '登录已过期，请重新登录');
+      }
+
+      if (!response.ok) {
+        throw new Error(`获取用户信息失败: ${data.message || response.statusText}`);
+      }
+
+      return data;
+    } catch (error) {
+      console.error('getUserInfo API调用失败:', error.message);
+      throw error;
+    }
+  },
+
+  /**
+   * 上传用户头像
+   * 对应后端接口：POST /api/user/avatar
+   * @param {FormData} formData 包含头像文件的FormData对象
+   * @returns {Promise<Object>} 包含新头像URL的响应对象
+   */
+  uploadAvatar: async function(formData) {
+    try {
+      const token = localStorage.getItem('access_token');
+      if (!token) throw new Error('用户未登录或token已过期');
+
+      const response = await fetch(`${API_BASE_URL}/user/avatar`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData,
+        credentials: 'include'
+      });
+
+      const data = await response.json();
+
+      if (response.status === 401) {
+        localStorage.removeItem('access_token');
+        throw new Error(data.message || '登录已过期，请重新登录');
+      }
+
+      if (!response.ok) {
+        throw new Error(`头像上传失败: ${data.message || response.statusText}`);
+      }
+
+      return data;
+    } catch (error) {
+      console.error('uploadAvatar API调用失败:', error.message);
+      throw error;
+    }
+  },
+
+  /**
+   * 更新用户个人信息
+   * 对应后端接口：PUT /api/user/info
+   * @param {Object} userData 包含用户信息的对象
+   * @returns {Promise<Object>} 更新后的用户信息
+   */
+  updateUserInfo: async function(userData) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/user/info`, {
+        method: 'PUT',
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify(userData),
+        credentials: 'include'
+      });
+
+      const data = await response.json();
+
+      if (response.status === 401) {
+        localStorage.removeItem('access_token');
+        throw new Error(data.message || '登录已过期，请重新登录');
+      }
+
+      if (!response.ok) {
+        throw new Error(`更新用户信息失败: ${data.message || response.statusText}`);
+      }
+
+      return data;
+    } catch (error) {
+      console.error('updateUserInfo API调用失败:', error.message);
+      throw error;
+    }
+  },
+
+  /**
+   * 修改用户密码
+   * 对应后端接口：POST /api/user/change-password
+   * @param {Object} passwordData 包含旧密码和新密码的对象
+   * @returns {Promise<Object>} 操作结果
+   */
+  changePassword: async function(passwordData) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/user/change-password`, {
+        method: 'POST',
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify(passwordData),
+        credentials: 'include'
+      });
+
+      const data = await response.json();
+
+      if (response.status === 401) {
+        localStorage.removeItem('access_token');
+        throw new Error(data.message || '登录已过期，请重新登录');
+      }
+
+      if (!response.ok) {
+        throw new Error(`修改密码失败: ${data.message || response.statusText}`);
+      }
+
+      return data;
+    } catch (error) {
+      console.error('changePassword API调用失败:', error.message);
+      throw error;
+    }
+  },
+
+  /**
+   * 用户退出登录
+   * 对应后端接口：POST /api/logout
+   * @returns {Promise<Object>} 退出结果
+   */
+  logout: async function() {
+    try {
+      const response = await fetch(`${API_BASE_URL}/logout`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        credentials: 'include'
+      });
+
+      const data = await response.json();
+
+      // 无论成功与否都清除本地token
+      localStorage.removeItem('access_token');
+
+      if (!response.ok) {
+        throw new Error(`退出登录失败: ${data.message || response.statusText}`);
+      }
+
+      return data;
+    } catch (error) {
+      console.error('logout API调用失败:', error.message);
+      throw error;
     }
   }
 };

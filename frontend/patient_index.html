@@ -46,6 +46,37 @@ tailwind.config = {
   .skeleton { @apply bg-neutral-200 animate-pulse rounded; }
 }
 </style>
+
+<style>
+/* 消息弹窗动画 */
+#notification-popup {
+  transform-origin: top right;
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.notification-item {
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.notification-item:last-child {
+  border-bottom: none;
+}
+
+.notification-item:hover {
+  background-color: #f8fafc;
+}
+</style>
 </head>
 <body class="bg-neutral-50 min-h-screen flex flex-col">
   <!-- 顶部导航栏 -->
@@ -66,12 +97,42 @@ tailwind.config = {
 
       
       <div class="hidden md:flex items-center space-x-6">
+        <!-- 消息通知按钮及弹窗 -->
         <div class="relative">
-          <button class="text-neutral-600 hover:text-patient-500 transition-300">
+          <button id="notification-btn" class="text-neutral-600 hover:text-patient-500 transition-300 focus:outline-none">
             <i class="fa fa-bell text-xl"></i>
-            <span class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-danger text-white text-xs rounded-full flex items-center justify-center"></span>
+            <!-- 在原代码中找到消息徽章的HTML部分，替换为： -->
+            <span class="absolute -top-1 -right-1 w-4 h-4 bg-danger text-white text-xs rounded-full flex items-center justify-center" id="notification-badge"></span>
           </button>
+          
+          <!-- 消息弹窗 - 增大宽度和最大高度 -->
+          <div id="notification-popup" class="hidden absolute right-0 mt-2 w-96 md:w-112 bg-white rounded-lg shadow-lg border border-neutral-200 z-50 overflow-hidden">
+            <div class="p-3 bg-neutral-50 border-b border-neutral-200">
+              <h3 class="font-medium text-neutral-800">预约消息</h3>
+            </div>
+            <div id="notification-content" class="max-h-96 overflow-y-auto scrollbar-hide">
+              <!-- 加载状态 -->
+              <div id="notification-loading" class="p-4 text-center">
+                <i class="fa fa-circle-o-notch fa-spin text-patient-500 text-xl mb-2"></i>
+                <p class="text-neutral-500 text-sm">加载中...</p>
+              </div>
+              
+              <!-- 空状态 -->
+              <div id="notification-empty" class="hidden p-6 text-center">
+                <div class="w-12 h-12 mx-auto bg-neutral-100 rounded-full flex items-center justify-center mb-2">
+                  <i class="fa fa-calendar-o text-neutral-400 text-xl"></i>
+                </div>
+                <p class="text-neutral-500 text-sm">暂无待处理的预约</p>
+              </div>
+            </div>
+            <div class="p-2 bg-neutral-50 border-t border-neutral-200">
+              <a href="patient_book.html" class="block text-center text-patient-600 hover:text-patient-700 text-sm font-medium transition-300">
+                更多预约
+              </a>
+            </div>
+          </div>
         </div>
+        
         <div>
           <button class="text-neutral-700 hover:text-patient-500 transition-300">
             <i class="fa fa-cog text-2xl"></i>
@@ -87,11 +148,11 @@ tailwind.config = {
           <button class="flex-1 px-4 py-2 rounded-full text-sm font-medium bg-patient-500 text-white text-center transition-300">病人端</button>
         </div>
         <nav class="space-y-1">
-          <a href="patient-home.html" class="block py-2 px-3 rounded-lg bg-patient-50 text-patient-700 font-medium">首页</a>
-          <a href="patient-ai-consult.html" class="block py-2 px-3 rounded-lg hover:bg-neutral-100 text-neutral-700 transition-300">AI问诊</a>
-          <a href="patient-doctor-book.html" class="block py-2 px-3 rounded-lg hover:bg-neutral-100 text-neutral-700 transition-300">预约医生</a>
-          <a href="patient-medical-record.html" class="block py-2 px-3 rounded-lg hover:bg-neutral-100 text-neutral-700 transition-300">我的病历</a>
-          <a href="patient-profile.html" class="block py-2 px-3 rounded-lg hover:bg-neutral-100 text-neutral-700 transition-300">个人中心</a>
+          <a href="patient_index.html" class="block py-2 px-3 rounded-lg bg-patient-50 text-patient-700 font-medium">首页</a>
+          <a href="patient_ai.html" class="block py-2 px-3 rounded-lg hover:bg-neutral-100 text-neutral-700 transition-300">AI问诊</a>
+          <a href="patient_book.html" class="block py-2 px-3 rounded-lg hover:bg-neutral-100 text-neutral-700 transition-300">预约医生</a>
+          <a href="patient_MyMR.html" class="block py-2 px-3 rounded-lg hover:bg-neutral-100 text-neutral-700 transition-300">我的病历</a>
+          <a href="patient_MyCenter.html" class="block py-2 px-3 rounded-lg hover:bg-neutral-100 text-neutral-700 transition-300">个人中心</a>
         </nav>
       </div>
     </div>
@@ -119,21 +180,21 @@ tailwind.config = {
           <h3 class="font-medium text-neutral-800">开始AI问诊</h3>
         </a>
 
-        <a href="patient-doctor-book.html" class="bg-white rounded-xl p-5 shadow hover:shadow-lg transition-300 flex flex-col items-center text-center group">
+        <a href="patient_book.html" class="bg-white rounded-xl p-5 shadow hover:shadow-lg transition-300 flex flex-col items-center text-center group">
           <div class="w-14 h-14 rounded-full bg-patient-100 flex items-center justify-center mb-3 group-hover:bg-patient-500 transition-300">
             <i class="fa fa-calendar-check-o text-patient-600 text-xl group-hover:text-white transition-300"></i>
           </div>
           <h3 class="font-medium text-neutral-800">预约医生</h3>
         </a>
 
-        <a href="patient-medical-record.html" class="bg-white rounded-xl p-5 shadow hover:shadow-lg transition-300 flex flex-col items-center text-center group">
+        <a href="patient_MyMR.html" class="bg-white rounded-xl p-5 shadow hover:shadow-lg transition-300 flex flex-col items-center text-center group">
           <div class="w-14 h-14 rounded-full bg-patient-100 flex items-center justify-center mb-3 group-hover:bg-patient-500 transition-300">
             <i class="fa fa-file-text-o text-patient-600 text-xl group-hover:text-white transition-300"></i>
           </div>
           <h3 class="font-medium text-neutral-800">我的病历</h3>
         </a>
 
-        <a href="patient-profile.html" class="bg-white rounded-xl p-5 shadow hover:shadow-lg transition-300 flex flex-col items-center text-center group">
+        <a href="patient_MyCenter.html" class="bg-white rounded-xl p-5 shadow hover:shadow-lg transition-300 flex flex-col items-center text-center group">
           <div class="w-14 h-14 rounded-full bg-patient-100 flex items-center justify-center mb-3 group-hover:bg-patient-500 transition-300">
             <i class="fa fa-user-o text-patient-600 text-xl group-hover:text-white transition-300"></i>
           </div>
@@ -198,11 +259,134 @@ tailwind.config = {
       header.classList.toggle('shadow', window.scrollY > 10);
     });
 
-    // 页面加载完成后获取用户信息和最近问诊记录
+    // 消息弹窗交互
     document.addEventListener('DOMContentLoaded', function() {
+      const notificationBtn = document.getElementById('notification-btn');
+      const notificationPopup = document.getElementById('notification-popup');
+      
+      // 点击消息按钮显示/隐藏弹窗
+      notificationBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        notificationPopup.classList.toggle('hidden');
+        // 只有在显示弹窗时才加载数据
+        if (!notificationPopup.classList.contains('hidden')) {
+          fetchPendingAppointments();
+        }
+      });
+      
+      // 点击页面其他地方关闭弹窗
+      document.addEventListener('click', function() {
+        notificationPopup.classList.add('hidden');
+      });
+      
+      // 点击弹窗内部不关闭弹窗
+      notificationPopup.addEventListener('click', function(e) {
+        e.stopPropagation();
+      });
+
+      // 页面加载时获取用户信息和最近问诊记录
       fetchUserInfo();
       fetchRecentConsultation();
+      // 检查是否有未处理的预约，更新消息徽章
+      checkPendingAppointments();
     });
+
+    // 检查是否有未处理的预约，用于更新消息徽章
+    function checkPendingAppointments() {
+      apiService.getPendingAppointments()
+        .then(appointments => {
+          const badge = document.getElementById('notification-badge');
+          if (appointments && appointments.length > 0) {
+            badge.style.display = 'flex';
+            // 显示预约数量
+            badge.textContent = appointments.length > 9 ? '9+' : appointments.length;
+          } else {
+            badge.style.display = 'none';
+          }
+        })
+        .catch(error => {
+          console.error('检查未处理预约失败:', error);
+        });
+    }
+
+    // 获取最新的待处理预约信息
+    function fetchPendingAppointments() {
+      apiService.getPendingAppointments()
+        .then(appointments => {
+          renderAppointments(appointments);
+        })
+        .catch(error => {
+          console.error('加载最新预约失败:', error);
+          const content = document.getElementById('notification-content');
+          content.innerHTML = `
+            <div class="p-4 text-center">
+              <i class="fa fa-exclamation-circle text-danger text-xl mb-2"></i>
+              <p class="text-neutral-500 text-sm">加载失败</p>
+            </div>
+          `;
+        });
+    }
+
+    // 渲染预约信息 - 修改为显示所有预约
+    function renderAppointments(appointments) {
+      const content = document.getElementById('notification-content');
+      
+      // 清空内容
+      content.innerHTML = '';
+      
+      // 检查是否有预约
+      if (!appointments || appointments.length === 0) {
+        content.innerHTML = `
+          <div class="p-6 text-center">
+            <div class="w-12 h-12 mx-auto bg-neutral-100 rounded-full flex items-center justify-center mb-2">
+              <i class="fa fa-calendar-o text-neutral-400 text-xl"></i>
+            </div>
+            <p class="text-neutral-500 text-sm">暂无待处理的预约</p>
+          </div>
+        `;
+        return;
+      }
+      
+      // 显示所有等待状态的预约
+      appointments.forEach(appointment => {
+        // 创建预约信息元素
+        const appointmentItem = document.createElement('div');
+        appointmentItem.className = 'notification-item p-4';
+        
+        // 格式化日期显示
+        const formattedDate = formatDate(appointment.appointmentDate);
+        
+        appointmentItem.innerHTML = `
+          <div class="flex items-start">
+            <div class="w-8 h-8 rounded-full bg-doctor-100 flex items-center justify-center mr-3 mt-0.5">
+              <i class="fa fa-user-md text-doctor-600 text-sm"></i>
+            </div>
+            <div class="flex-1">
+              <p class="text-neutral-800 text-sm font-medium">您预约了${appointment.doctorName}（${appointment.department}）</p>
+              <p class="text-neutral-600 text-xs mt-1">
+                日期: ${formattedDate} ${appointment.appointmentTime}
+              </p>
+              <p class="text-neutral-600 text-xs mt-1">
+                状态: <span class="text-warning">等待确认</span>
+              </p>
+              <p class="text-neutral-500 text-xs mt-2">
+                预约时间: ${appointment.createdAt}
+              </p>
+            </div>
+          </div>
+        `;
+        
+        content.appendChild(appointmentItem);
+      });
+    }
+
+    // 格式化日期显示 (YYYY-MM-DD -> MM月DD日)
+    function formatDate(dateString) {
+      const date = new Date(dateString);
+      const month = date.getMonth() + 1;
+      const day = date.getDate();
+      return `${month}月${day}日`;
+    }
 
     // 获取当前登录用户信息函数
     function fetchUserInfo() {
@@ -224,9 +408,9 @@ tailwind.config = {
         });
     }
 
-    // 修改后的获取最近的问诊记录函数
+    // 获取最近的问诊记录函数
     function fetchRecentConsultation() {
-      // 直接调用获取最近一条记录的API
+      // 调用获取最近一条记录的API
       apiService.getRecentMedicalRecord()
         .then(recentRecord => {
           renderRecentConsultation(recentRecord);
@@ -289,10 +473,11 @@ tailwind.config = {
     }
 
     // 处理问诊记录点击事件
-    document.querySelectorAll('.clickable-card').forEach(card => {
-      card.addEventListener('click', function() {
-        console.log('打开问诊记录:', this.getAttribute('href'));
-      });
+    document.addEventListener('click', function(e) {
+      if (e.target.closest('.clickable-card')) {
+        console.log('打开问诊记录详情');
+        // 这里可以添加跳转到详情页的逻辑
+      }
     });
   </script>
 </body>

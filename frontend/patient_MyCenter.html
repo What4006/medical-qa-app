@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>医智通 - 个人中心</title>
+  <!-- 基础样式与脚本 -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+
+  <!-- Tailwind配置 -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            patient: {
+              50: '#f0f7ff', 100: '#e0efff', 200: '#b9ddff', 
+              300: '#7cc3fc', 400: '#3d9fe8', 500: '#0a84e3', 
+              600: '#0066c7', 700: '#0052a3', 800: '#004382'
+            },
+            success: '#10b981', danger: '#ef4444'
+          },
+          fontFamily: {
+            sans: ['Microsoft YaHei', 'Source Han Sans CN', 'sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+
+  <style type="text/tailwindcss">
+    @layer utilities {
+      .content-auto { content-visibility: auto; }
+      .transition-300 { transition: all 300ms ease; }
+      .backdrop-blur { backdrop-filter: blur(8px); }
+      .input-field { @apply w-full px-4 py-2.5 rounded-lg border border-neutral-300 focus:border-patient-500 focus:ring-1 focus:ring-patient-500 outline-none transition-300; }
+      .textarea-field { @apply input-field min-h-[100px] resize-y; }
+      .input-error { @apply border-danger focus:border-danger focus:ring-danger; }
+      .error-text { @apply text-danger text-xs mt-1 hidden; }
+      .edit-btn { @apply w-full py-3 bg-patient-500 text-white rounded-lg font-medium hover:bg-patient-600 transition-300; }
+      .logout-btn { @apply w-full py-3 bg-white border border-danger text-danger rounded-lg font-medium hover:bg-danger/5 transition-300; }
+      .cancel-btn { @apply w-full py-3 bg-white border border-neutral-300 text-neutral-700 rounded-lg font-medium hover:bg-neutral-50 transition-300; }
+      .action-buttons { @apply bg-white border-t border-neutral-200 p-4 shadow-lg my-6; }
+      .loading { @apply animate-pulse text-neutral-400; }
+      .password-wrapper { @apply relative; }
+      .toggle-password { @apply absolute right-3 top-1/2 transform -translate-y-1/2 text-neutral-500 hover:text-patient-500 cursor-pointer transition-300; }
+    }
+  </style>
+</head>
+<body class="bg-neutral-50 min-h-screen flex flex-col">
+  <!-- 顶部导航栏 -->
+  <header class="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur shadow-sm transition-300">
+    <div class="container mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <button class="text-neutral-700 hover:text-patient-500 transition-300" onclick="history.back()">
+          <i class="fa fa-arrow-left text-xl"></i>
+        </button>
+        <h1 class="text-xl font-bold text-neutral-800">个人中心</h1>
+      </div>
+    </div>
+  </header>
+
+  <!-- 主内容区 -->
+  <main class="flex-1 pt-16 pb-6">
+    <div class="container mx-auto px-4 py-6">
+      <!-- 加载状态 -->
+      <div id="loading" class="py-16 text-center">
+        <i class="fa fa-circle-o-notch fa-spin text-patient-500 text-3xl mb-4"></i>
+        <p class="text-neutral-500">加载个人信息中...</p>
+      </div>
+
+      <!-- 内容区 (默认隐藏) -->
+      <div id="content" class="hidden">
+        <!-- 1. 用户头像与基础信息 -->
+        <div class="mb-8 bg-white rounded-xl shadow-sm overflow-hidden">
+          <div class="p-6">
+            <div class="flex flex-col md:flex-row items-center">
+              <!-- 用户头像 -->
+              <div class="mb-4 md:mb-0 md:mr-6">
+                <div class="relative">
+                  <div class="w-24 h-24 rounded-full bg-patient-100 flex items-center justify-center overflow-hidden">
+                    <span class="text-patient-700 font-bold text-3xl" id="avatar-initial">李</span>
+                    <img id="avatar-img" class="w-full h-full object-cover hidden" src="" alt="用户头像">
+                  </div>
+                  <button id="change-avatar" class="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-patient-500 text-white flex items-center justify-center shadow-md hover:bg-patient-600 transition-300 cursor-pointer">
+                    <i class="fa fa-camera text-sm"></i>
+                  </button>
+                  <input type="file" id="avatar-upload" accept="image/*" class="hidden">
+                </div>
+              </div>
+              
+              <!-- 基础信息 -->
+              <div class="flex-1 w-full">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-sm text-neutral-500 mb-1">姓名 <span class="text-danger">*</span></label>
+                    <input type="text" id="fullname" class="input-field" disabled>
+                    <p class="error-text" id="fullname-error">请输入真实姓名</p>
+                    <p class="text-xs text-neutral-500 mt-1">请输入您的真实姓名，将用于预约挂号</p>
+                  </div>
+                  <div>
+                    <label class="block text-sm text-neutral-500 mb-1">性别 <span class="text-danger">*</span></label>
+                    <select id="gender" class="input-field" disabled>
+                      <option value="" disabled>请选择</option>
+                      <option value="male">男</option>
+                      <option value="female">女</option>
+                    </select>
+                    <p class="error-text" id="gender-error">请选择性别</p>
+                  </div>
+                  <div>
+                    <label class="block text-sm text-neutral-500 mb-1">出生日期 <span class="text-danger">*</span></label>
+                    <input type="date" id="birthday" class="input-field" disabled>
+                    <p class="error-text" id="birthday-error">请选择出生日期</p>
+                    <p class="text-xs text-neutral-500 mt-1">请填写真实出生日期，用于年龄相关诊疗判断</p>
+                  </div>
+                  <div>
+                    <label class="block text-sm text-neutral-500 mb-1">联系电话 <span class="text-danger">*</span></label>
+                    <input type="tel" id="phone" class="input-field" disabled>
+                    <p class="error-text" id="phone-error">请输入正确的手机号码</p>
+                    <p class="text-xs text-neutral-500 mt-1">用于接收预约提醒和验证码</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. 身份信息 -->
+        <div class="mb-8 bg-white rounded-xl shadow-sm overflow-hidden">
+          <div class="p-6">
+            <h2 class="text-lg font-bold text-neutral-800 mb-4">身份信息</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm text-neutral-500 mb-1">身份证号 <span class="text-danger">*</span></label>
+                <input type="text" id="id-card" class="input-field" disabled>
+                <p class="error-text" id="id-card-error">请输入正确的身份证号</p>
+                <p class="text-xs text-neutral-500 mt-1">需与姓名一致，用于实名认证</p>
+              </div>
+              <div>
+                <label class="block text-sm text-neutral-500 mb-1">医保卡号（可选）</label>
+                <input type="text" id="insurance-card" class="input-field" disabled>
+                <p class="text-xs text-neutral-500 mt-1">填写后可使用医保结算</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. 病史信息 -->
+        <div class="mb-8 bg-white rounded-xl shadow-sm overflow-hidden">
+          <div class="p-6">
+            <h2 class="text-lg font-bold text-neutral-800 mb-4">病史信息</h2>
+            <div class="space-y-5">
+              <div>
+                <label class="block text-sm text-neutral-500 mb-1">既往史</label>
+                <textarea id="past-history" class="textarea-field" disabled></textarea>
+                <p class="text-xs text-neutral-500 mt-1">请填写您曾经患有的疾病、手术史、过敏史等</p>
+              </div>
+              <div>
+                <label class="block text-sm text-neutral-500 mb-1">个人史</label>
+                <textarea id="personal-history" class="textarea-field" disabled></textarea>
+                <p class="text-xs text-neutral-500 mt-1">请填写您的生活习惯、职业暴露史等</p>
+              </div>
+              <div>
+                <label class="block text-sm text-neutral-500 mb-1">家族史</label>
+                <textarea id="family-history" class="textarea-field" disabled></textarea>
+                <p class="text-xs text-neutral-500 mt-1">请填写直系亲属的重大疾病史、遗传性疾病史等</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. 账号安全 -->
+        <div class="mb-8 bg-white rounded-xl shadow-sm overflow-hidden">
+          <div class="p-6">
+            <h2 class="text-lg font-bold text-neutral-800 mb-4">账号安全</h2>
+            
+            <!-- 电子邮箱 -->
+            <div class="mb-5 pb-5 border-b border-neutral-100">
+              <label class="block text-sm text-neutral-500 mb-1">电子邮箱 <span class="text-danger">*</span></label>
+              <input type="email" id="email" class="input-field" disabled>
+              <p class="error-text" id="email-error">请输入正确的电子邮箱</p>
+              <p class="text-xs text-neutral-500 mt-1">用于账号找回和重要通知</p>
+            </div>
+            
+            <!-- 修改密码按钮（仅保留按钮） -->
+            <div class="py-2">
+                <button id="change-password" class="text-patient-600 hover:text-patient-700 hover:bg-patient-50 px-3 py-1.5 rounded-md text-base font-medium transition-300 whitespace-nowrap">
+                修改密码
+                </button>
+                <p class="text-xs text-neutral-500 mt-1">密码需包含字母和数字，长度不少于8位</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 底部操作按钮 -->
+        <div id="normal-actions" class="action-buttons">
+          <div class="container mx-auto px-4">
+            <div class="grid grid-cols-2 gap-4">
+              <button id="edit-profile" class="edit-btn flex items-center justify-center">
+                <i class="fa fa-edit mr-2"></i> 编辑资料
+              </button>
+              <button id="logout" class="logout-btn flex items-center justify-center">
+                <i class="fa fa-sign-out mr-2"></i> 退出登录
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 编辑状态底部按钮 (默认隐藏) -->
+        <div id="edit-actions" class="action-buttons hidden">
+          <div class="container mx-auto px-4">
+            <div class="grid grid-cols-2 gap-4">
+              <button id="cancel-edit" class="cancel-btn flex items-center justify-center">
+                <i class="fa fa-times mr-2"></i> 取消
+              </button>
+              <button id="save-profile" class="edit-btn flex items-center justify-center">
+                <i class="fa fa-check mr-2"></i> 完成编辑
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- 修改密码弹窗 (默认隐藏) -->
+  <div id="password-modal" class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center p-4">
+    <div class="bg-white rounded-2xl w-full max-w-md mx-auto overflow-hidden shadow-2xl">
+      <div class="p-6 border-b border-neutral-200">
+        <div class="flex items-center justify-between">
+          <h3 class="text-xl font-bold text-neutral-800">修改密码</h3>
+          <button id="close-password-modal" class="text-neutral-500 hover:text-neutral-700 transition-300">
+            <i class="fa fa-times text-xl"></i>
+          </button>
+        </div>
+      </div>
+      
+      <div class="p-6">
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-neutral-700 mb-1">原密码</label>
+          <div class="password-wrapper">
+            <input type="password" id="old-password" class="input-field" placeholder="请输入原密码">
+          </div>
+          <p class="error-text" id="old-password-error">请输入原密码</p>
+        </div>
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-neutral-700 mb-1">新密码</label>
+          <div class="password-wrapper">
+            <input type="password" id="new-password" class="input-field" placeholder="请输入新密码">
+          </div>
+          <p class="error-text" id="new-password-error">密码需包含字母和数字，长度不少于8位</p>
+          <p class="text-xs text-neutral-500 mt-1">密码需包含字母和数字，长度不少于8位</p>
+        </div>
+        <div class="mb-6">
+          <label class="block text-sm font-medium text-neutral-700 mb-1">确认新密码</label>
+          <div class="password-wrapper">
+            <input type="password" id="confirm-password" class="input-field" placeholder="请再次输入新密码">
+          </div>
+          <p class="error-text" id="confirm-password-error">两次输入的密码不一致</p>
+        </div>
+        
+        <div class="grid grid-cols-2 gap-3">
+          <button id="cancel-password" class="cancel-btn">取消</button>
+          <button id="save-password" class="edit-btn">确认修改</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 提示消息组件 -->
+  <div id="toast" class="fixed bottom-6 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-lg shadow-lg flex items-center z-50 hidden">
+    <i id="toast-icon" class="mr-2"></i>
+    <span id="toast-message"></span>
+  </div>
+
+  <!-- 退出登录确认弹窗 (默认隐藏) -->
+  <div id="logout-modal" class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center p-4">
+    <div class="bg-white rounded-2xl w-full max-w-md mx-auto overflow-hidden shadow-2xl">
+      <div class="p-6 text-center">
+        <div class="w-16 h-16 rounded-full bg-danger/10 flex items-center justify-center mx-auto mb-4">
+          <i class="fa fa-sign-out text-danger text-2xl"></i>
+        </div>
+        <h3 class="text-xl font-bold text-neutral-800 mb-2">确认退出登录？</h3>
+        <p class="text-neutral-600 mb-6">退出后需要重新登录才能继续使用服务</p>
+        
+        <div class="grid grid-cols-2 gap-3">
+          <button id="cancel-logout" class="cancel-btn">取消</button>
+          <button id="confirm-logout" class="logout-btn">确认退出</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 引入API服务 -->
+  <script src="js/services/apiService.js"></script>
+  
+  <script>
+    // 存储原始数据用于取消编辑时恢复
+    let originalData = {};
+    
+    // 页面加载完成后初始化
+    document.addEventListener('DOMContentLoaded', async function() {
+      try {
+        // 从API获取用户信息
+        const userInfo = await apiService.getUserInfo();
+        // 填充表单数据
+        populateUserInfo(userInfo);
+        // 保存原始数据
+        saveOriginalData();
+        // 显示内容，隐藏加载状态
+        document.getElementById('loading').classList.add('hidden');
+        document.getElementById('content').classList.remove('hidden');
+      } catch (error) {
+        console.error('加载用户信息失败:', error);
+        document.getElementById('loading').innerHTML = `
+          <div class="text-danger">
+            <i class="fa fa-exclamation-circle text-3xl mb-4"></i>
+            <p>加载失败，请刷新页面重试</p>
+          </div>
+        `;
+      }
+      
+      // 绑定事件
+      bindEvents();
+    });
+    
+    // 绑定所有事件处理函数
+    function bindEvents() {
+      // 编辑资料按钮点击事件
+      document.getElementById('edit-profile').addEventListener('click', enterEditMode);
+      
+      // 取消编辑按钮点击事件
+      document.getElementById('cancel-edit').addEventListener('click', exitEditMode);
+      
+      // 保存资料按钮点击事件
+      document.getElementById('save-profile').addEventListener('click', saveProfile);
+      
+      // 退出登录按钮点击事件
+      document.getElementById('logout').addEventListener('click', function() {
+        document.getElementById('logout-modal').classList.remove('hidden');
+        document.getElementById('logout-modal').classList.add('flex');
+        document.body.style.overflow = 'hidden';
+      });
+      
+      // 取消退出登录按钮点击事件
+      document.getElementById('cancel-logout').addEventListener('click', function() {
+        document.getElementById('logout-modal').classList.add('hidden');
+        document.getElementById('logout-modal').classList.remove('flex');
+        document.body.style.overflow = '';
+      });
+      
+      // 确认退出登录按钮点击事件
+      document.getElementById('confirm-logout').addEventListener('click', async function() {
+        try {
+          // 调用退出登录API
+          await apiService.logout();
+          document.getElementById('logout-modal').classList.add('hidden');
+          document.getElementById('logout-modal').classList.remove('flex');
+          document.body.style.overflow = '';
+          showToast('已成功退出登录', 'success');
+          setTimeout(() => {
+            // 实际应用中这里会跳转到登录页
+            window.location.href = 'login.html';
+          }, 1500);
+        } catch (error) {
+          showToast(error.message || '退出登录失败，请重试', 'error');
+        }
+      });
+      
+      // 点击弹窗外部关闭
+      document.getElementById('logout-modal').addEventListener('click', function(e) {
+        if (e.target === this) {
+          document.getElementById('logout-modal').classList.add('hidden');
+          document.getElementById('logout-modal').classList.remove('flex');
+          document.body.style.overflow = '';
+        }
+      });
+      
+      // 头像上传逻辑
+      document.getElementById('change-avatar').addEventListener('click', function() {
+        document.getElementById('avatar-upload').click();
+      });
+      
+      document.getElementById('avatar-upload').addEventListener('change', async function(e) {
+        if (e.target.files && e.target.files[0]) {
+          try {
+            // 验证文件类型
+            const fileType = e.target.files[0].type;
+            if (!fileType.match('image/jpeg') && !fileType.match('image/png')) {
+              showToast('请上传JPG或PNG格式的图片', 'error');
+              return;
+            }
+            
+            // 验证文件大小（不超过5MB）
+            if (e.target.files[0].size > 5 * 1024 * 1024) {
+              showToast('图片大小不能超过5MB', 'error');
+              return;
+            }
+            
+            // 调用API上传头像
+            const formData = new FormData();
+            formData.append('avatar', e.target.files[0]);
+            const result = await apiService.uploadAvatar(formData);
+            
+            // 显示新头像
+            const reader = new FileReader();
+            reader.onload = function(e) {
+              document.getElementById('avatar-img').src = e.target.result;
+              document.getElementById('avatar-img').classList.remove('hidden');
+              document.getElementById('avatar-initial').classList.add('hidden');
+              showToast('头像已成功更新', 'success');
+            }
+            reader.readAsDataURL(e.target.files[0]);
+            
+            // 更新原始数据中的头像信息
+            originalData.avatar = result.avatarUrl;
+          } catch (error) {
+            showToast(error.message || '头像上传失败，请重试', 'error');
+          }
+        }
+      });
+      
+      // 密码修改相关事件
+      document.getElementById('change-password').addEventListener('click', function() {
+        document.getElementById('password-modal').classList.remove('hidden');
+        document.getElementById('password-modal').classList.add('flex');
+        document.body.style.overflow = 'hidden';
+        // 清空之前的错误提示
+        clearPasswordErrors();
+      });
+      
+      document.getElementById('close-password-modal').addEventListener('click', closePasswordModalFunc);
+      document.getElementById('cancel-password').addEventListener('click', closePasswordModalFunc);
+      
+      document.getElementById('password-modal').addEventListener('click', function(e) {
+        if (e.target === this) {
+          closePasswordModalFunc();
+        }
+      });
+      
+      // 保存密码修改
+      document.getElementById('save-password').addEventListener('click', async function() {
+        if (validatePasswordForm()) {
+          try {
+            const passwordData = {
+              oldPassword: document.getElementById('old-password').value,
+              newPassword: document.getElementById('new-password').value
+            };
+            
+            // 调用API修改密码
+            await apiService.changePassword(passwordData);
+            
+            closePasswordModalFunc();
+            showToast('密码已成功修改', 'success');
+          } catch (error) {
+            showToast(error.message || '修改密码失败，请重试', 'error');
+          }
+        }
+      });
+      
+      // 密码输入实时验证
+      document.getElementById('new-password').addEventListener('input', function() {
+        validateNewPassword();
+      });
+      
+      document.getElementById('confirm-password').addEventListener('input', function() {
+        validateConfirmPassword();
+      });
+    }
+    
+    // 填充用户信息到表单
+    function populateUserInfo(userInfo) {
+      // 基础信息
+      document.getElementById('fullname').value = userInfo.fullname || '';
+      document.getElementById('gender').value = userInfo.gender || '';
+      document.getElementById('birthday').value = userInfo.birthday || '';
+      document.getElementById('phone').value = userInfo.phone || '';
+      
+      // 身份信息
+      document.getElementById('id-card').value = userInfo.idCard || '';
+      document.getElementById('insurance-card').value = userInfo.insuranceCard || '';
+      
+      // 病史信息
+      document.getElementById('past-history').value = userInfo.pastHistory || '';
+      document.getElementById('personal-history').value = userInfo.personalHistory || '';
+      document.getElementById('family-history').value = userInfo.familyHistory || '';
+      
+      // 账号安全（仅邮箱）
+      document.getElementById('email').value = userInfo.email || '';
+      
+      // 头像
+      if (userInfo.avatar) {
+        document.getElementById('avatar-img').src = userInfo.avatar;
+        document.getElementById('avatar-img').classList.remove('hidden');
+        document.getElementById('avatar-initial').classList.add('hidden');
+      } else {
+        // 使用姓名首字母作为默认头像
+        const initial = userInfo.fullname ? userInfo.fullname.charAt(0) : '用';
+        document.getElementById('avatar-initial').textContent = initial;
+      }
+    }
+    
+    // 关闭密码弹窗
+    function closePasswordModalFunc() {
+      const passwordModal = document.getElementById('password-modal');
+      passwordModal.classList.add('hidden');
+      passwordModal.classList.remove('flex');
+      document.body.style.overflow = '';
+      // 清空输入
+      document.getElementById('old-password').value = '';
+      document.getElementById('new-password').value = '';
+      document.getElementById('confirm-password').value = '';
+      // 清空错误提示
+      clearPasswordErrors();
+    }
+    
+    // 清除密码相关错误提示
+    function clearPasswordErrors() {
+      document.getElementById('old-password-error').classList.add('hidden');
+      document.getElementById('new-password-error').classList.add('hidden');
+      document.getElementById('confirm-password-error').classList.add('hidden');
+      
+      document.getElementById('old-password').classList.remove('input-error');
+      document.getElementById('new-password').classList.remove('input-error');
+      document.getElementById('confirm-password').classList.remove('input-error');
+    }
+    
+    // 验证新密码
+    function validateNewPassword() {
+      const newPassword = document.getElementById('new-password').value;
+      const errorElement = document.getElementById('new-password-error');
+      const inputElement = document.getElementById('new-password');
+      
+      if (newPassword.length < 8) {
+        errorElement.textContent = '密码长度不能少于8位';
+        errorElement.classList.remove('hidden');
+        inputElement.classList.add('input-error');
+        return false;
+      } else if (!/[A-Za-z]/.test(newPassword) || !/\d/.test(newPassword)) {
+        errorElement.textContent = '密码需同时包含字母和数字';
+        errorElement.classList.remove('hidden');
+        inputElement.classList.add('input-error');
+        return false;
+      } else {
+        errorElement.classList.add('hidden');
+        inputElement.classList.remove('input-error');
+        return true;
+      }
+    }
+    
+    // 验证确认密码
+    function validateConfirmPassword() {
+      const newPassword = document.getElementById('new-password').value;
+      const confirmPassword = document.getElementById('confirm-password').value;
+      const errorElement = document.getElementById('confirm-password-error');
+      const inputElement = document.getElementById('confirm-password');
+      
+      if (newPassword !== confirmPassword) {
+        errorElement.classList.remove('hidden');
+        inputElement.classList.add('input-error');
+        return false;
+      } else {
+        errorElement.classList.add('hidden');
+        inputElement.classList.remove('input-error');
+        return true;
+      }
+    }
+    
+    // 验证密码表单
+    function validatePasswordForm() {
+      let isValid = true;
+      clearPasswordErrors();
+      
+      // 验证原密码
+      const oldPassword = document.getElementById('old-password').value;
+      if (!oldPassword) {
+        document.getElementById('old-password-error').classList.remove('hidden');
+        document.getElementById('old-password').classList.add('input-error');
+        isValid = false;
+      }
+      
+      // 验证新密码
+      if (!validateNewPassword()) {
+        isValid = false;
+      }
+      
+      // 验证确认密码
+      if (!validateConfirmPassword()) {
+        isValid = false;
+      }
+      
+      return isValid;
+    }
+    
+    // 保存原始数据
+    function saveOriginalData() {
+      originalData = {
+        fullname: document.getElementById('fullname').value,
+        gender: document.getElementById('gender').value,
+        birthday: document.getElementById('birthday').value,
+        phone: document.getElementById('phone').value,
+        idCard: document.getElementById('id-card').value,
+        insuranceCard: document.getElementById('insurance-card').value,
+        email: document.getElementById('email').value,
+        pastHistory: document.getElementById('past-history').value,
+        personalHistory: document.getElementById('personal-history').value,
+        familyHistory: document.getElementById('family-history').value,
+        avatar: document.getElementById('avatar-img').src || ''
+      };
+    }
+    
+    // 进入编辑模式
+    function enterEditMode() {
+      // 显示编辑状态按钮，隐藏普通状态按钮
+      document.getElementById('normal-actions').classList.add('hidden');
+      document.getElementById('edit-actions').classList.remove('hidden');
+      
+      // 使所有输入框可编辑
+      const inputs = document.querySelectorAll('.input-field, .textarea-field');
+      inputs.forEach(input => {
+        input.disabled = false;
+      });
+      
+      // 滚动到顶部
+      window.scrollTo(0, 0);
+      
+      // 清除所有错误提示
+      clearAllErrors();
+    }
+    
+    // 退出编辑模式
+    function exitEditMode() {
+      // 显示普通状态按钮，隐藏编辑状态按钮
+      document.getElementById('normal-actions').classList.remove('hidden');
+      document.getElementById('edit-actions').classList.add('hidden');
+      
+      // 使所有输入框不可编辑
+      const inputs = document.querySelectorAll('.input-field, .textarea-field');
+      inputs.forEach(input => {
+        input.disabled = true;
+      });
+      
+      // 恢复原始数据
+      populateUserInfo(originalData);
+      
+      // 清除所有错误提示
+      clearAllErrors();
+    }
+    
+    // 保存个人资料
+    async function saveProfile() {
+      // 验证表单
+      if (validateForm()) {
+        try {
+          // 收集表单数据
+          const userData = {
+            fullname: document.getElementById('fullname').value.trim(),
+            gender: document.getElementById('gender').value,
+            birthday: document.getElementById('birthday').value,
+            phone: document.getElementById('phone').value.trim(),
+            idCard: document.getElementById('id-card').value.trim(),
+            insuranceCard: document.getElementById('insurance-card').value.trim(),
+            email: document.getElementById('email').value.trim(),
+            pastHistory: document.getElementById('past-history').value.trim(),
+            personalHistory: document.getElementById('personal-history').value.trim(),
+            familyHistory: document.getElementById('family-history').value.trim()
+          };
+          
+          // 调用API保存用户信息
+          await apiService.updateUserInfo(userData);
+          
+          // 更新原始数据
+          saveOriginalData();
+          
+          // 退出编辑模式
+          exitEditMode();
+          
+          // 显示成功提示
+          showToast('个人信息已成功更新', 'success');
+        } catch (error) {
+          showToast(error.message || '保存信息失败，请重试', 'error');
+        }
+      }
+    }
+    
+    // 验证表单
+    function validateForm() {
+      let isValid = true;
+      clearAllErrors();
+      
+      // 验证姓名
+      const fullname = document.getElementById('fullname').value.trim();
+      if (!fullname) {
+        showError('fullname', '请输入您的姓名');
+        isValid = false;
+      }
+      
+      // 验证性别
+      const gender = document.getElementById('gender').value;
+      if (!gender) {
+        showError('gender', '请选择您的性别');
+        isValid = false;
+      }
+      
+      // 验证出生日期
+      const birthday = document.getElementById('birthday').value;
+      if (!birthday) {
+        showError('birthday', '请选择您的出生日期');
+        isValid = false;
+      } else {
+        // 验证年龄是否合理（1-120岁）
+        const birthDate = new Date(birthday);
+        const today = new Date();
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const monthDiff = today.getMonth() - birthDate.getMonth();
+        
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+          age--;
+        }
+        
+        if (age < 1 || age > 120) {
+          showError('birthday', '请输入合理的出生日期');
+          isValid = false;
+        }
+      }
+      
+      // 验证手机号码
+      const phone = document.getElementById('phone').value.trim();
+      const phoneRegex = /^1[3-9]\d{9}$/;
+      if (!phone) {
+        showError('phone', '请输入您的手机号码');
+        isValid = false;
+      } else if (!phoneRegex.test(phone)) {
+        showError('phone', '请输入正确的手机号码');
+        isValid = false;
+      }
+      
+      // 验证身份证号
+      const idCard = document.getElementById('id-card').value.trim();
+      const idCardRegex = /(^\d{18}$)|(^\d{17}(\d|X|x)$)/;
+      if (!idCard) {
+        showError('id-card', '请输入您的身份证号');
+        isValid = false;
+      } else if (!idCardRegex.test(idCard)) {
+        showError('id-card', '请输入正确的身份证号');
+        isValid = false;
+      }
+      
+      // 验证电子邮箱
+      const email = document.getElementById('email').value.trim();
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!email) {
+        showError('email', '请输入您的电子邮箱');
+        isValid = false;
+      } else if (!emailRegex.test(email)) {
+        showError('email', '请输入正确的电子邮箱');
+        isValid = false;
+      }
+      
+      // 如果有错误，滚动到第一个错误位置
+      if (!isValid) {
+        const firstError = document.querySelector('.error-text:not(.hidden)');
+        if (firstError) {
+          firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }
+      
+      return isValid;
+    }
+    
+    // 显示错误提示
+    function showError(fieldId, message) {
+      const inputField = document.getElementById(fieldId);
+      const errorElement = document.getElementById(`${fieldId}-error`);
+      
+      inputField.classList.add('input-error');
+      errorElement.textContent = message;
+      errorElement.classList.remove('hidden');
+      
+      // 输入框内容变化时清除错误提示
+      inputField.oninput = function() {
+        inputField.classList.remove('input-error');
+        errorElement.classList.add('hidden');
+        inputField.oninput = null; // 只执行一次
+      };
+    }
+    
+    // 清除所有错误提示
+    function clearAllErrors() {
+      const errorElements = document.querySelectorAll('.error-text');
+      errorElements.forEach(el => {
+        el.classList.add('hidden');
+      });
+      
+      const inputFields = document.querySelectorAll('.input-field, .textarea-field');
+      inputFields.forEach(field => {
+        field.classList.remove('input-error');
+      });
+    }
+    
+    // 显示提示消息
+    function showToast(message, type = 'info') {
+      const toast = document.getElementById('toast');
+      const toastIcon = document.getElementById('toast-icon');
+      const toastMessage = document.getElementById('toast-message');
+      
+      // 设置消息内容
+      toastMessage.textContent = message;
+      
+      // 设置样式
+      toast.className = 'fixed bottom-6 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-lg shadow-lg flex items-center z-50';
+      
+      if (type === 'success') {
+        toast.classList.add('bg-success', 'text-white');
+        toastIcon.className = 'fa fa-check-circle mr-2';
+      } else if (type === 'error') {
+        toast.classList.add('bg-danger', 'text-white');
+        toastIcon.className = 'fa fa-exclamation-circle mr-2';
+      } else {
+        toast.classList.add('bg-neutral-800', 'text-white');
+        toastIcon.className = 'fa fa-info-circle mr-2';
+      }
+      
+      // 显示消息
+      toast.classList.remove('hidden');
+      
+      // 3秒后隐藏
+      setTimeout(() => {
+        toast.classList.add('hidden');
+      }, 3000);
+    }
+  </script>
+</body>
+</html>
