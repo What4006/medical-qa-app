@@ -2,7 +2,7 @@ from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from marshmallow import ValidationError
 from ..services import appointment_service
-from ..schemas.appointment_schema import AppointmentRequestSchema, AppointmentResponseSchema
+from ..schemas.appointment_schema import AppointmentRequestSchema, AppointmentResponseSchema, PendingAppointmentSchema
 import logging
 
 # 创建蓝图，定义 API 路由前缀
@@ -43,3 +43,34 @@ def create_appointment():
     except Exception as e:
         logging.error(f"创建预约时发生意外错误: {e}", exc_info=True)
         return jsonify({"error_code": 500, "message": "服务器内部错误"}), 500
+    
+# --------------------------
+# API #25: 获取待处理预约 (GET /api/appointments/pending)
+# --------------------------
+@appointment_bp.route('/pending', methods=['GET', 'OPTIONS']) # <--- 关键修正：允许 GET 和 OPTIONS
+@jwt_required()
+def get_pending_appointments_api():
+    """
+    API #25: 获取当前登录用户的所有待处理预约
+    """
+    # 解决 CORS 预检请求 (OPTIONS) 失败的问题
+    if request.method == 'OPTIONS':
+        return jsonify({}), 200
+
+    try:
+        patient_user_id = get_jwt_identity()
+        
+        # 1. 调用服务层获取数据
+        appointments = appointment_service.get_pending_appointments(patient_user_id)
+        
+        # 2. 序列化列表
+        schema = PendingAppointmentSchema(many=True)
+        result = schema.dump(appointments)
+        
+        # 3. 返回成功响应
+        return jsonify(result), 200
+
+    except Exception as e:
+        logging.error(f"Error in /api/appointments/pending GET: {e}", exc_info=True)
+        # 失败响应示例
+        return jsonify({"error_code": 500, "message": "服务器内部错误，获取待处理预约失败"}), 500

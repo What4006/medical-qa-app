@@ -55,3 +55,18 @@ def create_appointment(data, patient_user_id):
     except Exception as e:
         db.session.rollback()
         return None, f"创建预约失败: {e}"
+    
+def get_pending_appointments(patient_id):
+    """
+    API #25: 获取指定患者的所有待医生确认的预约信息
+    """
+    
+    # 联表查询 AppointmentModel, 关联 DoctorModel 和 UserModel
+    pending_appointments = AppointmentModel.query.join(
+        DoctorModel, AppointmentModel.doctor_id == DoctorModel.id
+    ).filter(
+        AppointmentModel.patient_id == patient_id,
+        AppointmentModel.status == 'scheduled' # 'scheduled' 状态表示待确认
+    ).order_by(AppointmentModel.appointment_time).all()
+
+    return pending_appointments
