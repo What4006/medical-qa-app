@@ -15,10 +15,15 @@ class UserModel(db.Model):
     full_name = db.Column(db.String(100), comment='真实姓名')
     gender = db.Column(db.String(10), comment='性别')
     birth_date = db.Column(db.Date, comment='出生日期') 
+    phone = db.Column(db.String(11), unique=True, nullable=True, comment='用户手机号码')
     basic_medical_history = db.Column(db.Text, comment='基础疾病史')
     personal_history = db.Column(db.Text, nullable=True, comment='个人史 ')
     family_history = db.Column(db.Text, nullable=True, comment='家族史')
     created_at = db.Column(db.DateTime, default=datetime.utcnow, comment='账户创建时间')
+    avatar_url = db.Column(db.String(255), nullable=True, comment='头像图片路径')
+    email = db.Column(db.String(120), unique=True, nullable=True, comment='电子邮箱')
+    id_card = db.Column(db.String(18), unique=True, nullable=True, comment='身份证号')
+    insurance_card = db.Column(db.String(50), nullable=True, comment='医保卡号')
 
     # --- 新增一个属性，用于动态计算年龄 ---
     @property
