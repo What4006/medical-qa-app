@@ -212,19 +212,3 @@ def change_password_api():
     except Exception as e:
         logging.error(f"Error in /api/user/change-password POST: {e}", exc_info=True)
         return jsonify({"error_code": 500, "message": "服务器内部错误，修改密码失败"}), 500
-
-
-# --------------------------
-# API #24: 用户退出登录 (POST /api/logout)
-# --------------------------
-@user_bp.route('/logout', methods=['POST']) 
-@jwt_required()
-def logout_api():
-    """清除当前用户的登录状态（使 token 失效），退出系统 [cite: 1195-1199]"""
-    # [cite_start]1. 返回成功 JSON [cite: 1207-1211]
-    response = jsonify({"message": "已成功退出登录"})
-    
-    # 2. 使 JWT Cookie 失效
-    unset_jwt_cookies(response)
-    
-    return response, 200

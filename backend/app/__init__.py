@@ -40,6 +40,8 @@ def create_app(config_name='default'):
     app.register_blueprint(doctor_bp)
     from .api.medical_record_api import medical_record_bp
     app.register_blueprint(medical_record_bp)
+    from .api.logout_api import logout_bp
+    app.register_blueprint(logout_bp)
 
     # 4. 导入数据库模型，以便 Flask-Migrate 能够检测到它们
     # 这是让 `flask db migrate` 正常工作的关键一步
