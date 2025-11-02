@@ -1,4 +1,5 @@
-from flask import Flask
+import os
+from flask import Flask, send_from_directory
 from .config import config
 from .core.extensions import db, migrate, cors, ma, jwt
 
@@ -46,5 +47,11 @@ def create_app(config_name='default'):
     # 4. 导入数据库模型，以便 Flask-Migrate 能够检测到它们
     # 这是让 `flask db migrate` 正常工作的关键一步
     from .models import user_model, consultation_model, appointment_model, review_model, medical_record_model, department_model
+
+    @app.route('/uploads/<path:filename>')
+    def serve_uploaded_file(filename):
+        # 使用 os.path.abspath 获取绝对路径以防止路径遍历攻击 (虽然 secure_filename 已处理)
+        return send_from_directory(os.path.join(app.root_path, '..', 'uploads'), filename)
+    # --- END: 关键修正 ---
 
     return app
