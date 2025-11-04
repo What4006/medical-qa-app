@@ -94,7 +94,7 @@ def login():
         return jsonify({"code": 401, "msg": "用户名或密码错误"}), 401
     
     # 创建 JWT Token，将用户ID作为身份标识
-    access_token = create_access_token(identity=user.id)
+    access_token = create_access_token(identity=str(user.id))
     
     response_data = {
         "code": 200,

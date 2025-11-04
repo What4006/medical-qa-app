@@ -1132,10 +1132,10 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
     // 登录成功，根据用户类型跳转不同页面（核心修改处）
     if (isDoctor) {
       alert('医生登录成功！');
-      window.location.href = '/doctor_index.html'; // 医生端首页
+      window.location.href = 'doctor_index.html'; // 医生端首页
     } else {
       alert('患者登录成功！');
-      window.location.href = '/patient_index.html'; // 患者端首页
+      window.location.href = 'patient_index.html'; // 患者端首页
     }
     
   } catch (error) {
