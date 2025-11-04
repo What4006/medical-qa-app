@@ -1,5 +1,6 @@
 import os
 from dotenv import load_dotenv
+from datetime import timedelta
 
 # 加载 .env 文件中的环境变量
 load_dotenv()
@@ -8,6 +9,7 @@ class Config:
     """基础配置类"""
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'a-hard-to-guess-string'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    JWT_ACCESS_TOKEN_EXPIRES = timedelta(days=1)
 
 class DevelopmentConfig(Config):
     """开发环境配置"""
