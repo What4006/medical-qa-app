@@ -10,6 +10,41 @@ function getAuthHeaders() {
   // 从localStorage获取登录时保存的token
   const token = localStorage.getItem('access_token');
   
+  /**
+ * 工具函数：保存登录状态到本地存储（新增）
+ * @param {string} token - 认证Token（与现有逻辑一致，使用access_token键名）
+ * @param {Object} user - 用户信息对象
+ */
+function saveLoginState(token, user) {
+  localStorage.setItem('access_token', token);
+  localStorage.setItem('user_info', JSON.stringify(user)); // 新增用户信息存储（可选）
+}
+
+/**
+ * 工具函数：清除本地登录状态（新增）
+ */
+function clearLoginState() {
+  localStorage.removeItem('access_token');
+  localStorage.removeItem('user_info');
+}
+
+/**
+ * 工具函数：检查是否已登录（新增）
+ * @returns {boolean} 登录状态（true=已登录，false=未登录）
+ */
+function isLoggedIn() {
+  return !!localStorage.getItem('access_token');
+}
+
+/**
+ * 工具函数：从本地存储获取当前用户信息（新增）
+ * @returns {Object|null} 用户信息（无登录状态时返回null）
+ */
+function getCurrentUserFromStorage() {
+  const userStr = localStorage.getItem('user_info');
+  return userStr ? JSON.parse(userStr) : null;
+}
+
   // 验证token是否存在
   if (!token) {
     throw new Error('用户未登录或token已过期');
@@ -23,6 +58,118 @@ function getAuthHeaders() {
 }
 
 const apiService = {
+  /**
+   * 用户登录接口（新增）
+   * 对应后端接口：POST /api/auth/login 
+   */
+  login: async function(phone, password, userType) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json' 
+        },
+        body: JSON.stringify({
+          phone,
+          password,
+          user_type: userType
+        }),
+        credentials: 'include'
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || `登录失败: ${response.statusText}`);
+      }
+
+      // 登录成功后保存token到localStorage
+      if (data.data && data.data.token) {
+        // 根据文档 [cite: 1021]，token 在 data.token 中
+        localStorage.setItem('access_token', data.data.token);
+      }
+
+      return data;
+    } catch (error) {
+      console.error('login API调用失败:', error.message);
+      throw error;
+    }
+  },
+
+  /**
+   * 患者注册接口（新增 - 已修正BUG）
+   * 对应后端接口：POST /api/auth/register/patient [cite: 960]
+   */
+  registerPatient: async function(phone, password, fullName, birthDate) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/register/patient`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          phone,
+          password,
+          // --- 关键修正 ---
+          // 后端 schema (auth_schema.py) 需要 'full_name' 而不是 'real_name'
+          full_name: fullName, 
+          // ------------------
+          birth_date: birthDate
+        }),
+        credentials: 'include'
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.msg || `患者注册失败: ${response.statusText}`);
+      }
+
+      return data;
+    } catch (error) {
+      console.error('registerPatient API调用失败:', error.message);
+      throw error;
+    }
+  },
+
+  /**
+   * 医生注册接口（新增）
+   * 对应后端接口：POST /api/auth/register/doctor 
+   * (注意：请确保您的表单也提交了 'full_name' 字段，后端 schema 需要它)
+   */
+  registerDoctor: async function(phone, password, fullName, licenseId, hospital, department, title, certificateFile) {
+    try {
+      const formData = new FormData();
+      formData.append('phone', phone);
+      formData.append('password', password);
+      formData.append('full_name', fullName); // <--- 建议添加此字段以匹配后端
+      formData.append('license_id', licenseId);
+      formData.append('hospital', hospital);
+      formData.append('department', department);
+      formData.append('title', title);
+      formData.append('certificate', certificateFile);
+
+      const response = await fetch(`${API_BASE_URL}/auth/register/doctor`, {
+        method: 'POST',
+        headers: {
+          // FormData无需设置Content-Type
+        },
+        body: formData,
+        credentials: 'include'
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.msg || `医生注册失败: ${response.statusText}`);
+      }
+
+      return data;
+    } catch (error) {
+      console.error('registerDoctor API调用失败:', error.message);
+      throw error;
+    }
+  },
   /**
    * 获取当前登录用户信息
    * 对应后端需要JWT认证的接口：GET /api/user/current

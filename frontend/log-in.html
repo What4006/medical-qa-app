@@ -1,0 +1,1338 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>医智通 - 医疗AI辅助问诊系统</title>
+  <!-- 引入Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- 引入Font Awesome -->
+  <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+  
+  <!-- 配置Tailwind自定义颜色和字体 -->
+  <script>
+
+// 后端API基础地址（根据实际部署环境修改）
+const API_BASE_URL = 'http://localhost:5000/api';
+
+/**
+ * 辅助函数：获取认证请求头
+ * @returns {Object} 包含认证信息的请求头配置
+ * @throws {Error} 当没有找到有效的token时抛出错误
+ */
+function getAuthHeaders() {
+  // 从localStorage获取登录时保存的token
+  const token = localStorage.getItem('access_token');
+  
+  // 验证token是否存在
+  if (!token) {
+    throw new Error('用户未登录或token已过期');
+  }
+  
+  // 返回包含认证信息的请求头
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}` // JWT认证格式
+  };
+}
+
+const apiService = {
+  /**
+   * 用户登录接口
+   * 对应后端接口：POST /api/auth/login
+   * @param {string} phone - 手机号（用户名）
+   * @param {string} password - 密码
+   * @param {number} userType - 用户类型（1=患者，2=医生）
+   * @returns {Promise<Object>} 登录结果（含token和用户信息）
+   */
+  login: async function(phone, password, userType) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json' // 登录接口无需认证头
+        },
+        body: JSON.stringify({
+          phone,
+          password,
+          user_type: userType
+        }),
+        credentials: 'include'
+      });
+
+      const data = await response.json();
+
+      // 处理错误状态
+      if (!response.ok) {
+        throw new Error(data.message || `登录失败: ${response.statusText}`);
+      }
+
+      // 登录成功后保存token到localStorage（与现有逻辑一致，使用access_token键名）
+      if (data.token) {
+        localStorage.setItem('access_token', data.token);
+      }
+
+      return data;
+    } catch (error) {
+      console.error('login API调用失败:', error.message);
+      throw error;
+    }
+  },
+
+  /**
+   * 患者注册接口
+   * 对应后端接口：POST /api/auth/register/patient
+   * @param {string} phone - 手机号
+   * @param {string} password - 密码
+   * @param {string} realName - 真实姓名
+   * @param {string} birthDate - 出生日期（YYYY-MM-DD）
+   * @returns {Promise<Object>} 注册结果
+   */
+  registerPatient: async function(phone, password, realName, birthDate) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/register/patient`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json' // 注册接口无需认证头
+        },
+        body: JSON.stringify({
+          phone,
+          password,
+          full_name: realName,// <--- 已修改
+          birth_date: birthDate
+        }),
+        credentials: 'include'
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || `患者注册失败: ${response.statusText}`);
+      }
+
+      return data;
+    } catch (error) {
+      console.error('registerPatient API调用失败:', error.message);
+      throw error;
+    }
+  },
+
+  /**
+   * 医生注册接口
+   * 对应后端接口：POST /api/auth/register/doctor
+   * @param {string} phone - 手机号
+   * @param {string} password - 密码
+   * @param {string} licenseId - 执业医师证号
+   * @param {string} hospital - 所属医院
+   * @param {string} department - 所属科室
+   * @param {string} title - 职称
+   * @param {File} certificateFile - 资质证明文件
+   * @returns {Promise<Object>} 注册结果
+   */
+  registerDoctor: async function(phone, password, licenseId, hospital, department, title, certificateFile) {
+    try {
+      const formData = new FormData();
+      formData.append('phone', phone);
+      formData.append('password', password);
+      formData.append('license_id', licenseId);
+      formData.append('hospital', hospital);
+      formData.append('department', department);
+      formData.append('title', title);
+      formData.append('certificate', certificateFile);
+
+      const response = await fetch(`${API_BASE_URL}/auth/register/doctor`, {
+        method: 'POST',
+        headers: {
+          // FormData无需设置Content-Type，浏览器自动处理
+          // 注册接口无需认证头
+        },
+        body: formData,
+        credentials: 'include'
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || `医生注册失败: ${response.statusText}`);
+      }
+
+      return data;
+    } catch (error) {
+      console.error('registerDoctor API调用失败:', error.message);
+      throw error;
+    }
+  }
+};
+
+// 登录状态工具函数
+function saveLoginState(token, user) {
+  localStorage.setItem('access_token', token);
+  localStorage.setItem('user_info', JSON.stringify(user));
+}
+
+function clearLoginState() {
+  localStorage.removeItem('access_token');
+  localStorage.removeItem('user_info');
+}
+
+function isLoggedIn() {
+  return !!localStorage.getItem('access_token');
+}
+
+function getCurrentUserFromStorage() {
+  const userStr = localStorage.getItem('user_info');
+  return userStr ? JSON.parse(userStr) : null;
+}
+
+
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#165DFF',
+            secondary: '#36BFFA',
+            accent: '#0FC6C2',
+            neutral: '#F5F7FA',
+            'neutral-dark': '#86909C',
+            'primary-dark': '#0E42D2',
+            'success': '#00B42A',
+            'warning': '#FF7D00',
+            'danger': '#F53F3F'
+          },
+          fontFamily: {
+            inter: ['Inter', 'system-ui', 'sans-serif'],
+          },
+        },
+      }
+    }
+  </script>
+  
+  <!-- 自定义工具类 -->
+  <style type="text/tailwindcss">
+    @layer utilities {
+      .content-auto {
+        content-visibility: auto;
+      }
+      .card-shadow {
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+      }
+      .btn-hover {
+        @apply transition-all duration-300 hover:shadow-lg transform hover:-translate-y-0.5;
+      }
+      .input-focus {
+        @apply focus:ring-2 focus:ring-primary/30 focus:border-primary focus:outline-none;
+      }
+      .input-error {
+        @apply border-danger focus:ring-danger/30 focus:border-danger;
+      }
+      .form-hint {
+        @apply text-xs text-neutral-dark mt-1;
+      }
+      .form-error {
+        @apply text-xs text-danger mt-1;
+      }
+      /* 平滑切换动画类 - 增强过渡效果 */
+      .panel-transition {
+        @apply transition-all duration-500 ease-in-out;
+      }
+      .panel-hidden {
+        @apply opacity-0 scale-95 pointer-events-none absolute translate-x-4;
+      }
+      .panel-visible {
+        @apply opacity-100 scale-100 pointer-events-auto relative translate-x-0;
+      }
+      /* 左侧文字容器对齐 */
+      .left-content {
+        @apply space-y-6 max-w-md mx-auto;
+      }
+      /* 滚动条美化 */
+      .custom-scrollbar::-webkit-scrollbar {
+        width: 6px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 10px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: #c1c1c1;
+        border-radius: 10px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: #a8a8a8;
+      }
+    }
+    
+    body {
+      height: 100%; /* 确保body占满视口高度 */
+      overflow: hidden; /* 防止body出现滚动条 */
+    }
+
+    /* 在这里添加新的全局滚动条样式 */
+    html {
+      overflow-y: scroll;
+    }
+    html::-webkit-scrollbar {
+      display: none;
+    }
+    html {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+
+<body class="font-inter bg-gradient-to-br from-blue-50 to-indigo-50 min-h-screen flex items-center justify-center p-4 md:p-8">
+  <!-- 主容器 -->
+  <div class="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-12">
+    
+    <!-- 左侧：品牌和说明（固定显示，文案随面板切换微调） -->
+    <div class="hidden lg:flex flex-col justify-center">
+      <!-- 左侧内容容器 - 新增对齐类 -->
+      <div class="left-content">
+        <!-- 品牌Logo和名称 -->
+        <div class="flex items-center space-x-3">
+          <div class="w-12 h-12 rounded-lg bg-primary flex items-center justify-center">
+            <i class="fa fa-heartbeat text-white text-2xl"></i>
+          </div>
+          <h1 class="text-[clamp(1.8rem,4vw,2.5rem)] font-bold text-gray-800">医智通</h1>
+        </div>
+        
+        <!-- 动态标题（随登录/注册切换） -->
+        <div id="left-title" class="panel-transition">
+          <h2 class="text-[clamp(1.5rem,3vw,2.2rem)] font-bold text-gray-800 leading-tight">
+            智能医疗辅助<br>让问诊更高效
+          </h2>
+        </div>
+        
+        <!-- 动态副标题（随登录/注册切换） -->
+        <div id="left-desc" class="panel-transition">
+          <p class="text-neutral-dark text-lg">
+            医智通AI辅助问诊系统，为医生提供智能诊断支持，为患者提供便捷问诊服务，连接医患，提升医疗效率。
+          </p>
+        </div>
+        
+        <!-- 动态特点列表（随登录/注册切换） -->
+        <div id="left-features" class="space-y-4 pt-4 panel-transition">
+          <div class="flex items-start space-x-3">
+            <div class="mt-1 text-primary"><i class="fa fa-check-circle"></i></div>
+            <div>
+              <h3 class="font-semibold text-gray-800">智能辅助诊断</h3>
+              <p class="text-neutral-dark text-sm">AI辅助分析症状，提供诊断建议</p>
+            </div>
+          </div>
+          <div class="flex items-start space-x-3">
+            <div class="mt-1 text-primary"><i class="fa fa-check-circle"></i></div>
+            <div>
+              <h3 class="font-semibold text-gray-800">高效问诊流程</h3>
+              <p class="text-neutral-dark text-sm">简化问诊步骤，提升诊疗效率</p>
+            </div>
+          </div>
+          <div class="flex items-start space-x-3">
+            <div class="mt-1 text-primary"><i class="fa fa-check-circle"></i></div>
+            <div>
+              <h3 class="font-semibold text-gray-800">安全数据管理</h3>
+              <p class="text-neutral-dark text-sm">严格保护患者隐私，符合医疗数据规范</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 右侧：表单容器（包含登录/注册两个面板，实现平滑切换） -->
+    <div class="relative">
+      <!-- 装饰元素 -->
+      <div class="absolute -top-6 -right-6 w-32 h-32 bg-primary/10 rounded-full blur-2xl"></div>
+      <div class="absolute -bottom-8 -left-8 w-40 h-40 bg-secondary/10 rounded-full blur-2xl"></div>
+      
+      <!-- 表单卡片容器（相对定位，用于面板绝对定位） -->
+      <div class="relative bg-white rounded-2xl p-6 md:p-8 card-shadow z-10">
+        <!-- 移动端Logo（固定显示） -->
+        <div class="flex items-center space-x-3 lg:hidden mb-6">
+          <div class="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
+            <i class="fa fa-heartbeat text-white text-xl"></i>
+          </div>
+          <h1 class="text-2xl font-bold text-gray-800">医智通</h1>
+        </div>
+        
+        <!-- 表单滚动容器 -->
+        <div class="form-scroll-container custom-scrollbar overflow-y-auto max-h-[580px] md:max-h-[620px] pr-2">
+          <!-- 1. 登录面板（默认显示） -->
+          <div id="login-panel" class="panel-visible panel-transition">
+            <!-- 登录标题 -->
+            <div class="mb-6">
+              <h2 class="text-[clamp(1.3rem,3vw,1.8rem)] font-bold text-gray-800">账户登录</h2>
+              <p class="text-neutral-dark mt-1">请选择登录类型并输入账号信息</p>
+            </div>
+            
+            <!-- 登录类型切换 -->
+            <div class="flex rounded-xl overflow-hidden mb-8 border border-gray-200">
+              <button id="patient-tab" class="flex-1 py-3 px-4 bg-primary text-white font-medium transition-all">
+                <i class="fa fa-user-o mr-2"></i>患者端
+              </button>
+              <button id="doctor-tab" class="flex-1 py-3 px-4 bg-white text-gray-600 font-medium transition-all">
+                <i class="fa fa-user-md mr-2"></i>医生端
+              </button>
+            </div>
+            
+            <!-- 登录表单 -->
+            <form id="login-form" class="space-y-5">
+              <!-- 用户名/手机号 -->
+              <div>
+                <label for="username" class="block text-sm font-medium text-gray-700 mb-1">用户名/手机号</label>
+                <div class="relative">
+                  <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-neutral-dark">
+                    <i class="fa fa-user"></i>
+                  </div>
+                  <input type="text" id="username" name="username" 
+                    class="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 input-focus transition-all"
+                    placeholder="请输入用户名或手机号" required>
+                </div>
+              </div>
+              
+              <!-- 密码 -->
+              <div>
+                <div class="flex justify-between items-center mb-1">
+                  <label for="password" class="block text-sm font-medium text-gray-700">密码</label>
+                  <a href="#" class="text-sm text-primary hover:text-primary-dark transition-colors">忘记密码？</a>
+                </div>
+                <div class="relative">
+                  <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-neutral-dark">
+                    <i class="fa fa-lock"></i>
+                  </div>
+                  <input type="password" id="password" name="password" 
+                    class="w-full pl-10 pr-10 py-3 rounded-lg border border-gray-300 input-focus transition-all"
+                    placeholder="请输入密码" required>
+                  <button type="button" id="toggle-password" class="absolute inset-y-0 right-0 pr-3 flex items-center text-neutral-dark hover:text-gray-700 transition-colors">
+                    <i class="fa fa-eye-slash"></i>
+                  </button>
+                </div>
+              </div>
+              
+              <!-- 验证码 (医生端特有) -->
+              <div id="captcha-group" class="hidden">
+                <label for="captcha" class="block text-sm font-medium text-gray-700 mb-1">医生验证码</label>
+                <div class="flex space-x-3">
+                  <div class="relative flex-1">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-neutral-dark">
+                      <i class="fa fa-shield"></i>
+                    </div>
+                    <input type="text" id="captcha" name="captcha" 
+                      class="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 input-focus transition-all"
+                      placeholder="请输入医生专属验证码">
+                  </div>
+                </div>
+              </div>
+              
+              <!-- 记住我 -->
+              <div class="flex items-center">
+                <input type="checkbox" id="remember" name="remember" class="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary">
+                <label for="remember" class="ml-2 block text-sm text-gray-700">记住我 30 天</label>
+              </div>
+              
+              <!-- 登录按钮 -->
+              <button type="submit" class="w-full bg-primary hover:bg-primary-dark text-white font-medium py-3 px-4 rounded-lg transition-all btn-hover">
+                登录系统
+              </button>
+              
+              <!-- 注册链接 -->
+              <div class="text-center text-sm text-neutral-dark">
+                还没有账号？
+                <a href="javascript:;" id="to-register-link" class="text-primary font-medium hover:text-primary-dark transition-colors">
+                  立即注册
+                </a>
+              </div>
+            </form>
+          </div>
+          
+          <!-- 2. 注册面板（默认隐藏） -->
+          <div id="register-panel" class="panel-hidden panel-transition">
+            <!-- 注册标题 -->
+            <div class="mb-6">
+              <h2 class="text-[clamp(1.3rem,3vw,1.8rem)] font-bold text-gray-800">账户注册</h2>
+              <p class="text-neutral-dark mt-1">请选择用户类型并完成信息填写</p>
+            </div>
+            
+            <!-- 注册类型切换 -->
+            <div class="flex rounded-xl overflow-hidden mb-8 border border-gray-200">
+              <button id="patient-register-tab" class="flex-1 py-3 px-4 bg-primary text-white font-medium transition-all">
+                <i class="fa fa-user-o mr-2"></i>患者注册
+              </button>
+              <button id="doctor-register-tab" class="flex-1 py-3 px-4 bg-white text-gray-600 font-medium transition-all">
+                <i class="fa fa-user-md mr-2"></i>医生申请
+              </button>
+            </div>
+            
+            <!-- 注册表单 -->
+            <form id="register-form" class="space-y-5">
+              <!-- 通用字段：手机号 -->
+              <div>
+                <label for="register-phone" class="block text-sm font-medium text-gray-700 mb-1">手机号码</label>
+                <div class="relative">
+                  <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-neutral-dark">
+                    <i class="fa fa-mobile text-lg"></i>
+                  </div>
+                  <input type="tel" id="register-phone" name="phone" 
+                    class="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 input-focus transition-all"
+                    placeholder="请输入11位手机号码" maxlength="11" required>
+                </div>
+                <div id="phone-error" class="form-error hidden">请输入有效的11位手机号码</div>
+              </div>
+              
+              <!-- 通用字段：密码（含强度提示） -->
+              <div>
+                <label for="register-password" class="block text-sm font-medium text-gray-700 mb-1">设置密码</label>
+                <div class="relative">
+                  <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-neutral-dark">
+                    <i class="fa fa-lock"></i>
+                  </div>
+                  <input type="password" id="register-password" name="password" 
+                    class="w-full pl-10 pr-10 py-3 rounded-lg border border-gray-300 input-focus transition-all"
+                    placeholder="请设置6-18位密码（含字母和数字）" required>
+                  <button type="button" id="toggle-register-password" class="absolute inset-y-0 right-0 pr-3 flex items-center text-neutral-dark hover:text-gray-700 transition-colors">
+                    <i class="fa fa-eye-slash"></i>
+                  </button>
+                </div>
+                <div id="password-error" class="form-error hidden">密码需包含字母和数字，长度6-18位</div>
+                
+                <!-- 密码强度提示条 -->
+                <div id="password-strength" class="mt-2 hidden">
+                  <div class="flex justify-between text-xs mb-1">
+                    <span>密码强度</span>
+                    <span id="strength-text" class="text-danger">弱</span>
+                  </div>
+                  <div class="h-1 w-full bg-gray-200 rounded-full overflow-hidden">
+                    <div id="strength-bar" class="h-full bg-danger w-1/3 transition-all"></div>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- 通用字段：确认密码 -->
+              <div>
+                <label for="register-confirm-password" class="block text-sm font-medium text-gray-700 mb-1">确认密码</label>
+                <div class="relative">
+                  <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-neutral-dark">
+                    <i class="fa fa-lock"></i>
+                  </div>
+                  <input type="password" id="register-confirm-password" name="confirmPassword" 
+                    class="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 input-focus transition-all"
+                    placeholder="请再次输入密码" required>
+                </div>
+                <div id="confirm-password-error" class="form-error hidden">两次输入的密码不一致</div>
+              </div>
+              
+              <!-- 患者专属字段：真实姓名 -->
+              <div id="patient-name-group" class="">
+                <label for="patient-name" class="block text-sm font-medium text-gray-700 mb-1">真实姓名</label>
+                <div class="relative">
+                  <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-neutral-dark">
+                    <i class="fa fa-user"></i>
+                  </div>
+                  <input type="text" id="patient-name" name="patientName" 
+                    class="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 input-focus transition-all"
+                    placeholder="请输入您的真实姓名" required>
+                </div>
+                <div id="patient-name-error" class="form-error hidden">请输入真实姓名</div>
+                <p class="form-hint">姓名将用于预约挂号和病历管理，需与身份证一致</p>
+              </div>
+              
+              <!-- 患者专属字段：出生日期 -->
+              <div id="patient-birth-group" class="">
+                <label for="patient-birth" class="block text-sm font-medium text-gray-700 mb-1">出生日期</label>
+                <div class="relative">
+                  <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-neutral-dark">
+                    <i class="fa fa-calendar"></i>
+                  </div>
+                  <input type="date" id="patient-birth" name="patientBirth" 
+                    class="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 input-focus transition-all"
+                    required>
+                </div>
+                <div id="patient-birth-error" class="form-error hidden">请选择出生日期</div>
+              </div>
+              
+              <!-- 医生专属字段：执业医师证号 -->
+              <div id="doctor-id-group" class="hidden">
+                <label for="doctor-id" class="block text-sm font-medium text-gray-700 mb-1">执业医师证号</label>
+                <div class="relative">
+                  <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-neutral-dark">
+                    <i class="fa fa-id-card"></i>
+                  </div>
+                  <input type="text" id="doctor-id" name="doctorId" 
+                    class="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 input-focus transition-all"
+                    placeholder="请输入15位执业医师证号" maxlength="15">
+                </div>
+                <div id="doctor-id-error" class="form-error hidden">请输入有效的执业医师证号</div>
+                <p class="form-hint">证号可在执业医师证书上查询，用于身份核验</p>
+              </div>
+              
+              <!-- 医生专属字段：所属医院 -->
+              <div id="doctor-hospital-group" class="hidden">
+                <label for="doctor-hospital" class="block text-sm font-medium text-gray-700 mb-1">所属医院</label>
+                <div class="relative">
+                  <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-neutral-dark">
+                    <i class="fa fa-hospital-o"></i>
+                  </div>
+                  <input type="text" id="doctor-hospital" name="doctorHospital" 
+                    class="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 input-focus transition-all"
+                    placeholder="请输入您所在的医院名称">
+                </div>
+                <div id="doctor-hospital-error" class="form-error hidden">请输入医院名称</div>
+              </div>
+              
+              <!-- 医生专属字段：科室 -->
+              <div id="doctor-department-group" class="hidden">
+                <label for="doctor-department" class="block text-sm font-medium text-gray-700 mb-1">所属科室</label>
+                <div class="relative">
+                  <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-neutral-dark">
+                    <i class="fa fa-stethoscope"></i>
+                  </div>
+                  <select id="doctor-department" name="doctorDepartment" 
+                    class="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 input-focus transition-all appearance-none bg-white">
+                    <option value="">请选择科室</option>
+                    <option value="内科">内科</option>
+                    <option value="外科">外科</option>
+                    <option value="妇产科">妇产科</option>
+                    <option value="儿科">儿科</option>
+                    <option value="急诊科">急诊科</option>
+                    <option value="皮肤科">皮肤科</option>
+                    <option value="眼科">眼科</option>
+                    <option value="耳鼻喉科">耳鼻喉科</option>
+                    <option value="口腔科">口腔科</option>
+                    <option value="精神心理科">精神心理科</option>
+                    <option value="中医科">中医科</option>
+                    <option value="其他">其他</option>
+                  </select>
+                  <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-neutral-dark">
+                    <i class="fa fa-chevron-down text-xs"></i>
+                  </div>
+                </div>
+                <div id="doctor-department-error" class="form-error hidden">请选择科室</div>
+              </div>
+              
+              <!-- 医生专属字段：职称 -->
+              <div id="doctor-title-group" class="hidden">
+                <label for="doctor-title" class="block text-sm font-medium text-gray-700 mb-1">职称</label>
+                <div class="relative">
+                  <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-neutral-dark">
+                    <i class="fa fa-trophy"></i>
+                  </div>
+                  <select id="doctor-title" name="doctorTitle" 
+                    class="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 input-focus transition-all appearance-none bg-white">
+                    <option value="">请选择职称</option>
+                    <option value="住院医师">住院医师</option>
+                    <option value="主治医师">主治医师</option>
+                    <option value="副主任医师">副主任医师</option>
+                    <option value="主任医师">主任医师</option>
+                    <option value="其他">其他</option>
+                  </select>
+                  <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-neutral-dark">
+                    <i class="fa fa-chevron-down text-xs"></i>
+                  </div>
+                </div>
+                <div id="doctor-title-error" class="form-error hidden">请选择职称</div>
+              </div>
+              
+              <!-- 医生专属字段：资质证明上传 -->
+              <div id="doctor-certificate-group" class="hidden">
+                <label class="block text-sm font-medium text-gray-700 mb-1">资质证明上传</label>
+                <div class="flex items-center justify-center w-full">
+                  <label for="doctor-certificate" class="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer bg-neutral hover:bg-gray-100 transition-all">
+                    <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                      <i class="fa fa-cloud-upload text-2xl text-neutral-dark mb-2"></i>
+                      <p class="mb-1 text-sm text-neutral-dark"><span class="font-semibold">点击上传</span> 或拖放文件</p>
+                      <p class="text-xs text-neutral-dark">支持JPG、PNG格式，不超过5MB</p>
+                    </div>
+                    <input id="doctor-certificate" type="file" class="hidden" accept="image/jpeg,image/png" />
+                  </label>
+                </div>
+                <div id="certificate-preview" class="mt-2 hidden">
+                  <img id="certificate-img" src="" alt="资质证明预览" class="max-h-40 rounded border border-gray-200" />
+                </div>
+                <div id="doctor-certificate-error" class="form-error hidden">请上传资质证明图片</div>
+              </div>
+              
+              <!-- 注册协议 -->
+              <div class="flex items-start mt-4">
+                <input type="checkbox" id="agree-protocol" name="agreeProtocol" class="w-4 h-4 mt-1 text-primary border-gray-300 rounded focus:ring-primary">
+                <label for="agree-protocol" class="ml-2 block text-sm text-gray-700">
+                  我已阅读并同意<a href="#" class="text-primary hover:underline">《用户服务协议》</a>和<a href="#" class="text-primary hover:underline">《隐私政策》</a>
+                </label>
+                <div id="protocol-error" class="form-error hidden absolute">请阅读并同意用户协议</div>
+              </div>
+              
+              <!-- 注册按钮 -->
+              <button type="submit" class="w-full bg-primary hover:bg-primary-dark text-white font-medium py-3 px-4 rounded-lg transition-all btn-hover">
+                完成注册
+              </button>
+              
+              <!-- 返回登录链接 -->
+              <div class="text-center text-sm text-neutral-dark">
+                已有账号？
+                <a href="javascript:;" id="to-login-link" class="text-primary font-medium hover:text-primary-dark transition-colors">
+                  返回登录
+                </a>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- 页脚 -->
+  <footer class="absolute bottom-4 left-0 right-0 text-center text-neutral-dark text-sm">
+    <p>© 2023 医智通医疗科技有限公司 版权所有 | 医疗执业许可证：XXX-XXXXXXX</p>
+  </footer>
+
+  <!-- JavaScript -->
+  <script>
+    // 存储当前登录角色状态（默认患者）
+    let currentRole = 'patient';
+    
+    // DOM元素获取
+    const loginPanel = document.getElementById('login-panel');
+    const registerPanel = document.getElementById('register-panel');
+    const toRegisterLink = document.getElementById('to-register-link');
+    const toLoginLink = document.getElementById('to-login-link');
+    const leftTitle = document.getElementById('left-title');
+    const leftDesc = document.getElementById('left-desc');
+    const leftFeatures = document.getElementById('left-features');
+    const formScrollContainer = document.querySelector('.form-scroll-container');
+    
+    // 登录类型切换
+    const patientTab = document.getElementById('patient-tab');
+    const doctorTab = document.getElementById('doctor-tab');
+    const captchaGroup = document.getElementById('captcha-group');
+    
+    // 注册类型切换
+    const patientRegisterTab = document.getElementById('patient-register-tab');
+    const doctorRegisterTab = document.getElementById('doctor-register-tab');
+    const patientFields = [
+      document.getElementById('patient-name-group'),
+      document.getElementById('patient-birth-group')
+    ];
+    const doctorFields = [
+      document.getElementById('doctor-id-group'),
+      document.getElementById('doctor-hospital-group'),
+      document.getElementById('doctor-department-group'),
+      document.getElementById('doctor-title-group'),
+      document.getElementById('doctor-certificate-group')
+    ];
+    
+    // 密码显示切换
+    const togglePassword = document.getElementById('toggle-password');
+    const passwordInput = document.getElementById('password');
+    const toggleRegisterPassword = document.getElementById('toggle-register-password');
+    const registerPasswordInput = document.getElementById('register-password');
+    
+    // 密码强度相关
+    const passwordStrength = document.getElementById('password-strength');
+    const strengthBar = document.getElementById('strength-bar');
+    const strengthText = document.getElementById('strength-text');
+    const registerPassword = document.getElementById('register-password');
+    const confirmPassword = document.getElementById('register-confirm-password');
+    
+    // 资质证明上传
+    const doctorCertificate = document.getElementById('doctor-certificate');
+    const certificatePreview = document.getElementById('certificate-preview');
+    const certificateImg = document.getElementById('certificate-img');
+    
+    // 登录/注册面板切换 - 增强视觉流畅度
+    toRegisterLink.addEventListener('click', () => {
+      // 记录当前登录角色
+      currentRole = patientTab.classList.contains('bg-primary') ? 'patient' : 'doctor';
+      
+      // 添加延迟以增强动画效果
+      loginPanel.classList.remove('panel-visible');
+      loginPanel.classList.add('panel-hidden');
+      
+      // 左侧文字先淡出
+      leftTitle.style.opacity = '0';
+      leftDesc.style.opacity = '0';
+      leftFeatures.style.opacity = '0';
+      
+      // 延迟更新左侧内容，与表单动画同步
+      setTimeout(() => {
+        // 更新左侧文案
+        leftTitle.innerHTML = `
+          <h2 class="text-[clamp(1.5rem,3vw,2.2rem)] font-bold text-gray-800 leading-tight">
+            快速注册<br>开启智能医疗服务
+          </h2>
+        `;
+        
+        leftDesc.innerHTML = `
+          <p class="text-neutral-dark text-lg">
+            注册医智通账户，患者可便捷预约问诊，医生可获取AI辅助诊断工具，共同体验高效医疗服务。
+          </p>
+        `;
+        
+        leftFeatures.innerHTML = `
+          <div class="flex items-start space-x-3">
+            <div class="mt-1 text-primary"><i class="fa fa-check-circle"></i></div>
+            <div>
+              <h3 class="font-semibold text-gray-800">患者专属权益</h3>
+              <p class="text-neutral-dark text-sm">在线预约、智能导诊、病历管理</p>
+            </div>
+          </div>
+          <div class="flex items-start space-x-3">
+            <div class="mt-1 text-primary"><i class="fa fa-check-circle"></i></div>
+            <div>
+              <h3 class="font-semibold text-gray-800">医生工作助手</h3>
+              <p class="text-neutral-dark text-sm">AI辅助诊断、患者管理、诊疗模板</p>
+            </div>
+          </div>
+          <div class="flex items-start space-x-3">
+            <div class="mt-1 text-primary"><i class="fa fa-check-circle"></i></div>
+            <div>
+              <h3 class="font-semibold text-gray-800">安全身份认证</h3>
+              <p class="text-neutral-dark text-sm">多重身份核验，保障账户与数据安全</p>
+            </div>
+          </div>
+        `;
+        
+        // 左侧文字淡入
+        leftTitle.style.opacity = '1';
+        leftDesc.style.opacity = '1';
+        leftFeatures.style.opacity = '1';
+        
+        // 显示注册面板
+        registerPanel.classList.remove('panel-hidden');
+        registerPanel.classList.add('panel-visible');
+        
+        // 根据当前角色自动切换注册类型
+        if (currentRole === 'doctor') {
+          doctorRegisterTab.click();
+        } else {
+          patientRegisterTab.click();
+        }
+        
+        // 重置滚动位置
+        formScrollContainer.scrollTop = 0;
+      }, 200); // 与动画时长匹配的延迟
+    });
+    
+    toLoginLink.addEventListener('click', () => {
+      // 隐藏注册面板
+      registerPanel.classList.remove('panel-visible');
+      registerPanel.classList.add('panel-hidden');
+      
+      // 左侧文字先淡出
+      leftTitle.style.opacity = '0';
+      leftDesc.style.opacity = '0';
+      leftFeatures.style.opacity = '0';
+      
+      // 延迟更新左侧内容
+      setTimeout(() => {
+        // 恢复左侧文案
+        leftTitle.innerHTML = `
+          <h2 class="text-[clamp(1.5rem,3vw,2.2rem)] font-bold text-gray-800 leading-tight">
+            智能医疗辅助<br>让问诊更高效
+          </h2>
+        `;
+        
+        leftDesc.innerHTML = `
+          <p class="text-neutral-dark text-lg">
+            医智通AI辅助问诊系统，为医生提供智能诊断支持，为患者提供便捷问诊服务，连接医患，提升医疗效率。
+          </p>
+        `;
+        
+        leftFeatures.innerHTML = `
+          <div class="flex items-start space-x-3">
+            <div class="mt-1 text-primary"><i class="fa fa-check-circle"></i></div>
+            <div>
+              <h3 class="font-semibold text-gray-800">智能辅助诊断</h3>
+              <p class="text-neutral-dark text-sm">AI辅助分析症状，提供诊断建议</p>
+            </div>
+          </div>
+          <div class="flex items-start space-x-3">
+            <div class="mt-1 text-primary"><i class="fa fa-check-circle"></i></div>
+            <div>
+              <h3 class="font-semibold text-gray-800">高效问诊流程</h3>
+              <p class="text-neutral-dark text-sm">简化问诊步骤，提升诊疗效率</p>
+            </div>
+          </div>
+          <div class="flex items-start space-x-3">
+            <div class="mt-1 text-primary"><i class="fa fa-check-circle"></i></div>
+            <div>
+              <h3 class="font-semibold text-gray-800">安全数据管理</h3>
+              <p class="text-neutral-dark text-sm">严格保护患者隐私，符合医疗数据规范</p>
+            </div>
+          </div>
+        `;
+        
+        // 左侧文字淡入
+        leftTitle.style.opacity = '1';
+        leftDesc.style.opacity = '1';
+        leftFeatures.style.opacity = '1';
+        
+        // 显示登录面板
+        loginPanel.classList.remove('panel-hidden');
+        loginPanel.classList.add('panel-visible');
+        
+        // 根据之前记录的角色恢复登录类型
+        if (currentRole === 'doctor') {
+          doctorTab.click();
+        } else {
+          patientTab.click();
+        }
+        
+        // 重置滚动位置
+        formScrollContainer.scrollTop = 0;
+      }, 200);
+    });
+    
+    // 登录页患者/医生切换
+    patientTab.addEventListener('click', () => {
+      patientTab.classList.remove('bg-white', 'text-gray-600');
+      patientTab.classList.add('bg-primary', 'text-white');
+      
+      doctorTab.classList.remove('bg-primary', 'text-white');
+      doctorTab.classList.add('bg-white', 'text-gray-600');
+      
+      // 隐藏医生验证码
+      captchaGroup.classList.add('hidden');
+      
+      // 更新当前角色
+      currentRole = 'patient';
+    });
+    
+    doctorTab.addEventListener('click', () => {
+      doctorTab.classList.remove('bg-white', 'text-gray-600');
+      doctorTab.classList.add('bg-primary', 'text-white');
+      
+      patientTab.classList.remove('bg-primary', 'text-white');
+      patientTab.classList.add('bg-white', 'text-gray-600');
+      
+      // 显示医生验证码
+      captchaGroup.classList.remove('hidden');
+      
+      // 更新当前角色
+      currentRole = 'doctor';
+    });
+    
+    // 注册页患者/医生切换
+    patientRegisterTab.addEventListener('click', () => {
+      patientRegisterTab.classList.remove('bg-white', 'text-gray-600');
+      patientRegisterTab.classList.add('bg-primary', 'text-white');
+      
+      doctorRegisterTab.classList.remove('bg-primary', 'text-white');
+      doctorRegisterTab.classList.add('bg-white', 'text-gray-600');
+      
+      // 显示患者字段，隐藏医生字段
+      patientFields.forEach(field => {
+        field.classList.remove('hidden');
+        // 添加淡入动画
+        field.style.opacity = '0';
+        setTimeout(() => field.style.opacity = '1', 50);
+      });
+      doctorFields.forEach(field => field.classList.add('hidden'));
+      
+      // 更新当前角色
+      currentRole = 'patient';
+      
+      // 调整滚动位置
+      formScrollContainer.scrollTop = 0;
+    });
+    
+    doctorRegisterTab.addEventListener('click', () => {
+      doctorRegisterTab.classList.remove('bg-white', 'text-gray-600');
+      doctorRegisterTab.classList.add('bg-primary', 'text-white');
+      
+      patientRegisterTab.classList.remove('bg-primary', 'text-white');
+      patientRegisterTab.classList.add('bg-white', 'text-gray-600');
+      
+      // 显示医生字段，隐藏患者字段
+      doctorFields.forEach(field => {
+        field.classList.remove('hidden');
+        // 添加淡入动画
+        field.style.opacity = '0';
+        setTimeout(() => field.style.opacity = '1', 50);
+      });
+      patientFields.forEach(field => field.classList.add('hidden'));
+      
+      // 更新当前角色
+      currentRole = 'doctor';
+      
+      // 调整滚动位置
+      formScrollContainer.scrollTop = 0;
+    });
+    
+    // 密码显示/隐藏切换
+    togglePassword.addEventListener('click', () => {
+      togglePasswordVisibility(passwordInput, togglePassword.querySelector('i'));
+    });
+    
+    toggleRegisterPassword.addEventListener('click', () => {
+      togglePasswordVisibility(registerPasswordInput, toggleRegisterPassword.querySelector('i'));
+    });
+    
+    // 密码显示/隐藏通用函数
+    function togglePasswordVisibility(input, icon) {
+      const type = input.getAttribute('type') === 'password' ? 'text' : 'password';
+      input.setAttribute('type', type);
+      
+      // 切换图标
+      icon.classList.toggle('fa-eye');
+      icon.classList.toggle('fa-eye-slash');
+    }
+    
+    // 密码强度检测
+    registerPassword.addEventListener('input', () => {
+      const password = registerPassword.value;
+      const passwordError = document.getElementById('password-error');
+      const confirmPasswordError = document.getElementById('confirm-password-error');
+      
+      // 显示强度条
+      if (password.length > 0) {
+        passwordStrength.classList.remove('hidden');
+      } else {
+        passwordStrength.classList.add('hidden');
+      }
+      
+      // 验证密码格式
+      if (password.length > 0 && (!/(?=.*[A-Za-z])(?=.*\d)/.test(password) || password.length < 6 || password.length > 18)) {
+        passwordError.classList.remove('hidden');
+        registerPassword.classList.add('input-error');
+      } else {
+        passwordError.classList.add('hidden');
+        registerPassword.classList.remove('input-error');
+      }
+      
+      // 检查密码强度
+      let strength = 0;
+      if (password.length >= 6) strength++;
+      if (password.length >= 10) strength++;
+      if (/[A-Z]/.test(password) && /[a-z]/.test(password)) strength++;
+      if (/[0-9]/.test(password)) strength++;
+      if (/[^A-Za-z0-9]/.test(password)) strength++;
+      
+      // 更新强度条显示
+      updatePasswordStrength(strength);
+      
+      // 检查确认密码
+      if (confirmPassword.value.length > 0) {
+        if (password !== confirmPassword.value) {
+          confirmPasswordError.classList.remove('hidden');
+          confirmPassword.classList.add('input-error');
+        } else {
+          confirmPasswordError.classList.add('hidden');
+          confirmPassword.classList.remove('input-error');
+        }
+      }
+    });
+    
+    // 确认密码验证
+    confirmPassword.addEventListener('input', () => {
+      const confirmPasswordError = document.getElementById('confirm-password-error');
+      
+      if (registerPassword.value !== confirmPassword.value) {
+        confirmPasswordError.classList.remove('hidden');
+        confirmPassword.classList.add('input-error');
+      } else {
+        confirmPasswordError.classList.add('hidden');
+        confirmPassword.classList.remove('input-error');
+      }
+    });
+    
+    // 更新密码强度显示
+    function updatePasswordStrength(strength) {
+      // 0-2: 弱, 3-4: 中, 5: 强
+      if (strength <= 2) {
+        strengthBar.className = 'h-full bg-danger w-1/3 transition-all';
+        strengthText.className = 'text-danger';
+        strengthText.textContent = '弱';
+      } else if (strength <= 4) {
+        strengthBar.className = 'h-full bg-warning w-2/3 transition-all';
+        strengthText.className = 'text-warning';
+        strengthText.textContent = '中';
+      } else {
+        strengthBar.className = 'h-full bg-success w-full transition-all';
+        strengthText.className = 'text-success';
+        strengthText.textContent = '强';
+      }
+    }
+    
+    // 资质证明上传预览
+    doctorCertificate.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        // 验证文件类型和大小
+        const fileType = file.type;
+        const fileSize = file.size;
+        
+        if (!fileType.match('image/jpeg') && !fileType.match('image/png')) {
+          alert('请上传JPG或PNG格式的图片');
+          doctorCertificate.value = '';
+          return;
+        }
+        
+        if (fileSize > 5 * 1024 * 1024) {
+          alert('图片大小不能超过5MB');
+          doctorCertificate.value = '';
+          return;
+        }
+        
+        // 预览图片
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          certificateImg.src = event.target.result;
+          certificatePreview.classList.remove('hidden');
+          
+          // 滚动到预览区域
+          certificatePreview.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        };
+        reader.readAsDataURL(file);
+      } else {
+        certificatePreview.classList.add('hidden');
+        certificateImg.src = '';
+      }
+    });
+    
+    
+// 登录表单提交处理
+document.getElementById('login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  
+  // 获取表单数据
+  const username = document.getElementById('username').value.trim();
+  const password = document.getElementById('password').value;
+  const isDoctor = doctorTab.classList.contains('bg-primary');
+  
+  // 简单验证
+  if (!username || !password) {
+    alert('请输入用户名和密码');
+    return;
+  }
+  
+  // 医生端需要验证码（实际项目中应该验证）
+  if (isDoctor) {
+    const captcha = document.getElementById('captcha').value;
+    if (!captcha) {
+      alert('请输入医生验证码');
+      return;
+    }
+  }
+  
+  try {
+    // 显示加载状态
+    const submitBtn = e.submitter;
+    const originalText = submitBtn.innerHTML;
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fa fa-spinner fa-spin mr-2"></i>登录中...';
+    
+    // 调用真实API（修改这里：替换原有假login函数调用）
+    const result = await apiService.login(
+      username, 
+      password, 
+      isDoctor ? 2 : 1 // 1=患者，2=医生（与后端user_type定义一致）
+    );
+    
+    // 保存登录状态
+    saveLoginState(result.data.token, result.data.user);
+    
+    // 登录成功，根据用户类型跳转不同页面（核心修改处）
+    if (isDoctor) {
+      alert('医生登录成功！');
+      window.location.href = '/doctor_index.html'; // 医生端首页
+    } else {
+      alert('患者登录成功！');
+      window.location.href = '/patient_index.html'; // 患者端首页
+    }
+    
+  } catch (error) {
+    alert(error.message || '登录失败，请重试');
+  } finally {
+    // 恢复按钮状态
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = originalText;
+  }
+});
+    
+// 注册表单提交处理
+document.getElementById('register-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  
+  // 获取表单数据
+  const phone = document.getElementById('register-phone').value.trim();
+  const password = document.getElementById('register-password').value;
+  const confirmPwd = document.getElementById('register-confirm-password').value;
+  const agreeProtocol = document.getElementById('agree-protocol').checked;
+  const isDoctor = doctorRegisterTab.classList.contains('bg-primary');
+  
+  let isValid = true;
+  
+  // 验证手机号
+  if (!/^1[3-9]\d{9}$/.test(phone)) {
+    document.getElementById('phone-error').classList.remove('hidden');
+    document.getElementById('register-phone').classList.add('input-error');
+    isValid = false;
+  } else {
+    document.getElementById('phone-error').classList.add('hidden');
+    document.getElementById('register-phone').classList.remove('input-error');
+  }
+  
+  // 验证密码
+  if (!/(?=.*[A-Za-z])(?=.*\d)/.test(password) || password.length < 6 || password.length > 18) {
+    document.getElementById('password-error').classList.remove('hidden');
+    document.getElementById('register-password').classList.add('input-error');
+    isValid = false;
+  } else {
+    document.getElementById('password-error').classList.add('hidden');
+    document.getElementById('register-password').classList.remove('input-error');
+  }
+  
+  // 验证确认密码
+  if (password !== confirmPwd) {
+    document.getElementById('confirm-password-error').classList.remove('hidden');
+    document.getElementById('register-confirm-passwordd').classList.add('input-error');
+    isValid = false;
+  } else {
+    document.getElementById('confirm-password-error').classList.add('hidden');
+    document.getElementById('register-confirm-password').classList.remove('input-error');
+  }
+  
+  // 验证用户协议
+  if (!agreeProtocol) {
+    document.getElementById('protocol-error').classList.remove('hidden');
+    isValid = false;
+  } else {
+    document.getElementById('protocol-error').classList.add('hidden');
+  }
+  
+  // 验证患者专属字段
+  let patientName, patientBirth;
+  if (!isDoctor) {
+    patientName = document.getElementById('patient-name').value.trim();
+    patientBirth = document.getElementById('patient-birth').value;
+    
+    if (!patientName) {
+      document.getElementById('patient-name-error').classList.remove('hidden');
+      document.getElementById('patient-name').classList.add('input-error');
+      isValid = false;
+    } else {
+      document.getElementById('patient-name-error').classList.add('hidden');
+      document.getElementById('patient-name').classList.remove('input-error');
+    }
+    
+    if (!patientBirth) {
+      document.getElementById('patient-birth-error').classList.remove('hidden');
+      document.getElementById('patient-birth').classList.add('input-error');
+      isValid = false;
+    } else {
+      document.getElementById('patient-birth-error').classList.add('hidden');
+      document.getElementById('patient-birth').classList.remove('input-error');
+    }
+  }
+  
+  // 验证医生专属字段
+  let licenseId, hospital, department, title, certificateFile;
+  if (isDoctor) {
+    licenseId = document.getElementById('doctor-id').value.trim();
+    hospital = document.getElementById('doctor-hospital').value.trim();
+    department = document.getElementById('doctor-department').value;
+    title = document.getElementById('doctor-title').value;
+    certificateFile = document.getElementById('doctor-certificate').files[0];
+    
+    if (!licenseId || licenseId.length !== 15) {
+      document.getElementById('doctor-id-error').classList.remove('hidden');
+      document.getElementById('doctor-id').classList.add('input-error');
+      isValid = false;
+    } else {
+      document.getElementById('doctor-id-error').classList.add('hidden');
+      document.getElementById('doctor-id').classList.remove('input-error');
+    }
+    
+    if (!hospital) {
+      document.getElementById('doctor-hospital-error').classList.remove('hidden');
+      document.getElementById('doctor-hospital').classList.add('input-error');
+      isValid = false;
+    } else {
+      document.getElementById('doctor-hospital-error').classList.add('hidden');
+      document.getElementById('doctor-hospital').classList.remove('input-error');
+    }
+    
+    if (!department) {
+      document.getElementById('doctor-department-error').classList.remove('hidden');
+      document.getElementById('doctor-department').classList.add('input-error');
+      isValid = false;
+    } else {
+      document.getElementById('doctor-department-error').classList.add('hidden');
+      document.getElementById('doctor-department').classList.remove('input-error');
+    }
+    
+    if (!title) {
+      document.getElementById('doctor-title-error').classList.remove('hidden');
+      document.getElementById('doctor-title').classList.add('input-error');
+      isValid = false;
+    } else {
+      document.getElementById('doctor-title-error').classList.add('hidden');
+      document.getElementById('doctor-title').classList.remove('input-error');
+    }
+    
+    if (!certificateFile) {
+      document.getElementById('doctor-certificate-error').classList.remove('hidden');
+      isValid = false;
+    } else {
+      document.getElementById('doctor-certificate-error').classList.add('hidden');
+    }
+  }
+  
+  // 验证通过，提交表单
+  if (isValid) {
+    try {
+      // 显示加载状态
+      const submitBtn = e.submitter;
+      const originalText = submitBtn.innerHTML;
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<i class="fa fa-spinner fa-spin mr-2"></i>注册中...';
+      
+      if (isDoctor) {
+        // 医生注册（修改这里：调用真实API）
+        await apiService.registerDoctor(
+          phone, 
+          password, 
+          licenseId, 
+          hospital, 
+          department, 
+          title, 
+          certificateFile
+        );
+        alert('医生注册成功，等待审核通过后即可登录');
+      } else {
+        // 患者注册（修改这里：调用真实API）
+        await apiService.registerPatient(
+          phone, 
+          password, 
+          patientName, 
+          patientBirth
+        );
+        alert('患者注册成功，请登录');
+      }
+      
+      // 注册成功后切换到登录面板
+      toLoginLink.click();
+      
+    } catch (error) {
+      alert(error.message || '注册失败，请重试');
+    } finally {
+      // 恢复按钮状态
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = originalText;
+    }
+  }
+});
+  
+
+// 页面加载完成后执行
+document.addEventListener('DOMContentLoaded', () => {
+  // 检查用户是否已登录
+  if (isLoggedIn()) {
+    // 如果已登录，跳转到首页
+    window.location.href = 'patient_index.html';
+  }
+});
+
+
+
+  </script>
+</body>
+</html>
